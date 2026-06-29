@@ -38,20 +38,24 @@ FFmpeg, TTS and Whisper transcription are **real on both platforms** (CPU-capabl
 
 ---
 
-## Quick start (development, macOS)
+## Quick start (development)
 
-Prerequisites: Node 20+, Python 3.11+, Docker Desktop.
+> 📘 **New here?** Read the full step-by-step guide for macOS & Windows:
+> **[docs/SETUP.md](docs/SETUP.md)** — prerequisites, Docker & hybrid workflows,
+> tests, and troubleshooting.
+
+Prerequisites: Docker Desktop + Git. (For non-Docker dev: Node 22, Python 3.11.)
 
 ```bash
-# 1. Start infra (Postgres, Redis, MinIO) + backend + frontend
+# Start everything (Postgres, Redis, MinIO, API, worker, frontend)
 docker compose -f infra/compose.dev.yml up --build
 
 # Frontend:  http://localhost:3000
 # API docs:  http://localhost:8000/docs
-# MinIO:     http://localhost:9001
+# MinIO:     http://localhost:9001  (aurora / aurora-secret)
 ```
 
-See `docs/` for local (non-Docker) development of each part.
+For local (non-Docker) development of each part, see **[docs/SETUP.md](docs/SETUP.md)**.
 
 ## Build phases
 
