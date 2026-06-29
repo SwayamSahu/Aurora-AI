@@ -1,0 +1,15 @@
+# Cross-platform media + AI helpers that run REAL on macOS (CPU) and the GPU box.
+# These are genuinely tested on the Mac — only diffusion generation is deferred.
+-r base.txt
+
+# Video assembly / editing / export (FFmpeg backed)
+ffmpeg-python==0.2.0
+moviepy==2.1.2
+Pillow==10.4.0
+
+# Speech-to-text for auto-subtitles (Phase 6) — CPU-capable, real on Mac & Linux
+faster-whisper==1.1.1
+requests==2.32.3
+
+# Text-to-speech (Phase 6) uses OS-native engines (macOS `say`, Linux
+# `espeak-ng`) — no Python package needed. Piper is a future quality upgrade.

@@ -1,0 +1,28 @@
+# Core backend — cross-platform, installs on macOS (Apple Silicon) and Linux.
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+email-validator==2.2.0
+python-multipart==0.0.20
+
+# Database
+SQLAlchemy==2.0.36
+alembic==1.14.0
+psycopg2-binary==2.9.10
+
+# Async jobs
+celery==5.4.0
+redis==5.2.1
+
+# Object storage (S3 / MinIO)
+minio==7.2.13
+
+# Auth (used from Phase 1)
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+# passlib 1.7.4 is incompatible with bcrypt>=4.1 (removed __about__); pin it.
+bcrypt==4.0.1
+
+# Utilities
+httpx==0.28.1

@@ -1,0 +1,376 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Dark mode driven by a `.dark` class on <html> (next-themes attribute="class") */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ------------------------------------------------------------------ *
+ * Aurora design tokens
+ * Semantic colors in OKLCH. Light is the default; .dark overrides.
+ * ------------------------------------------------------------------ */
+:root {
+  --radius: 0.625rem;
+
+  --background: oklch(0.99 0.002 270);
+  --foreground: oklch(0.21 0.02 270);
+
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.21 0.02 270);
+
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.21 0.02 270);
+
+  /* Aurora brand: indigo/violet */
+  --primary: oklch(0.55 0.22 285);
+  --primary-foreground: oklch(0.99 0.005 285);
+
+  --secondary: oklch(0.96 0.008 270);
+  --secondary-foreground: oklch(0.3 0.02 270);
+
+  --muted: oklch(0.96 0.008 270);
+  --muted-foreground: oklch(0.55 0.02 270);
+
+  --accent: oklch(0.95 0.03 285);
+  --accent-foreground: oklch(0.3 0.05 285);
+
+  --destructive: oklch(0.58 0.22 27);
+  --destructive-foreground: oklch(0.99 0.005 27);
+
+  --success: oklch(0.62 0.16 155);
+  --success-foreground: oklch(0.99 0.005 155);
+
+  --warning: oklch(0.72 0.16 75);
+  --warning-foreground: oklch(0.26 0.05 75);
+
+  --border: oklch(0.92 0.006 270);
+  --input: oklch(0.92 0.006 270);
+  --ring: oklch(0.55 0.22 285);
+
+  /* App-shell specific surfaces */
+  --sidebar: oklch(0.985 0.003 270);
+  --sidebar-foreground: oklch(0.21 0.02 270);
+  --sidebar-border: oklch(0.92 0.006 270);
+  --sidebar-accent: oklch(0.95 0.03 285);
+  --sidebar-accent-foreground: oklch(0.3 0.05 285);
+}
+
+.dark {
+  --background: oklch(0.17 0.012 270);
+  --foreground: oklch(0.96 0.005 270);
+
+  --card: oklch(0.21 0.014 270);
+  --card-foreground: oklch(0.96 0.005 270);
+
+  --popover: oklch(0.21 0.014 270);
+  --popover-foreground: oklch(0.96 0.005 270);
+
+  --primary: oklch(0.67 0.19 285);
+  --primary-foreground: oklch(0.16 0.02 285);
+
+  --secondary: oklch(0.27 0.015 270);
+  --secondary-foreground: oklch(0.96 0.005 270);
+
+  --muted: oklch(0.27 0.015 270);
+  --muted-foreground: oklch(0.68 0.015 270);
+
+  --accent: oklch(0.3 0.04 285);
+  --accent-foreground: oklch(0.92 0.03 285);
+
+  --destructive: oklch(0.62 0.2 27);
+  --destructive-foreground: oklch(0.97 0.005 27);
+
+  --success: oklch(0.6 0.15 155);
+  --success-foreground: oklch(0.97 0.005 155);
+
+  --warning: oklch(0.75 0.15 75);
+  --warning-foreground: oklch(0.2 0.04 75);
+
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 14%);
+  --ring: oklch(0.67 0.19 285);
+
+  --sidebar: oklch(0.19 0.013 270);
+  --sidebar-foreground: oklch(0.96 0.005 270);
+  --sidebar-border: oklch(1 0 0 / 8%);
+  --sidebar-accent: oklch(0.3 0.04 285);
+  --sidebar-accent-foreground: oklch(0.92 0.03 285);
+}
+
+/* Map semantic tokens to Tailwind utilities (bg-background, text-primary, …) */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
+  --font-pixel: var(--font-pixel-display), ui-monospace, monospace;
+
+  /* Marketplace accents (constant, theme-independent) */
+  --color-mk-violet: var(--mk-violet);
+  --color-mk-lavender: var(--mk-lavender);
+  --color-mk-cyan: var(--mk-cyan);
+  --color-mk-emerald: var(--mk-emerald);
+  --color-mk-coral: var(--mk-coral);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Accessible focus rings everywhere */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+  /* Respect reduced-motion */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}
+
+/* Thin, themed scrollbars */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+}
+
+/* ------------------------------------------------------------------ *
+ * Marketing landing — animated aurora backdrop
+ * ------------------------------------------------------------------ */
+@layer utilities {
+  .aurora-blob {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(72px);
+    opacity: 0.5;
+    will-change: transform;
+  }
+  .dark .aurora-blob {
+    opacity: 0.38;
+  }
+  .aurora-blob--a {
+    top: -10%;
+    left: 8%;
+    width: 42rem;
+    height: 42rem;
+    background: radial-gradient(circle at 30% 30%, oklch(0.7 0.19 285), transparent 70%);
+    animation: aurora-drift-a 22s ease-in-out infinite;
+  }
+  .aurora-blob--b {
+    top: 0%;
+    right: 4%;
+    width: 38rem;
+    height: 38rem;
+    background: radial-gradient(circle at 60% 40%, oklch(0.62 0.2 320), transparent 70%);
+    animation: aurora-drift-b 26s ease-in-out infinite;
+  }
+  .aurora-blob--c {
+    bottom: -20%;
+    left: 35%;
+    width: 36rem;
+    height: 36rem;
+    background: radial-gradient(circle at 50% 50%, oklch(0.66 0.16 230), transparent 70%);
+    animation: aurora-drift-c 30s ease-in-out infinite;
+  }
+
+  /* Subtle marquee for the ecosystem strip */
+  .animate-marquee {
+    animation: marquee 32s linear infinite;
+  }
+  .marquee-pause:hover .animate-marquee {
+    animation-play-state: paused;
+  }
+}
+
+@keyframes aurora-drift-a {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(6%, 8%, 0) scale(1.12); }
+}
+@keyframes aurora-drift-b {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1.05); }
+  50% { transform: translate3d(-7%, 6%, 0) scale(0.95); }
+}
+@keyframes aurora-drift-c {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(4%, -8%, 0) scale(1.1); }
+}
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+/* Hero showreel: active slide's progress bar fills over its display window. */
+@keyframes showreel-fill {
+  from { width: 0; }
+  to { width: 100%; }
+}
+
+/* Feature-tab voice HUD: animated audio waveform bars. */
+@keyframes voice-wave {
+  0%, 100% { transform: scaleY(0.4); }
+  50% { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora-blob,
+  .animate-marquee {
+    animation: none !important;
+  }
+}
+
+/* ================================================================== *
+ * Explore marketplace — scoped cinematic dark theme
+ * Tokens harmonized to Aurora (violet primary, cyan secondary).
+ * Everything is namespaced under `.explore-root` so it never leaks
+ * into the rest of the app, which keeps its own light/dark theme.
+ * ================================================================== */
+:root {
+  --mk-bg: #0a0a0b;
+  --mk-surface-1: #131316;
+  --mk-surface-2: #1a1a1e;
+  --mk-surface-hover: #222227;
+  --mk-border: rgba(255, 255, 255, 0.08);
+  --mk-border-strong: rgba(255, 255, 255, 0.14);
+  --mk-text: #f5f5f7;
+  --mk-text-muted: #8a8a90;
+  --mk-text-dim: #5e5e66;
+
+  /* Accents — Aurora violet primary + electric cyan secondary */
+  --mk-violet: oklch(0.7 0.19 285);
+  --mk-lavender: #c4b5fd;
+  --mk-cyan: #22d3ee;
+  --mk-emerald: #34d399;
+  --mk-coral: #fb7185;
+
+  --mk-grad-create: linear-gradient(135deg, #c9b7ff 0%, #a78bfa 100%);
+  --mk-grad-make-yours: linear-gradient(90deg, #f5b8d0 0%, #d9b3f5 50%, #c4b5fd 100%);
+
+  --mk-stat-bg: rgba(8, 8, 10, 0.55);
+  --mk-shadow-card-hover: 0 18px 50px -12px rgba(0, 0, 0, 0.75);
+  --mk-shadow-lift: 0 8px 30px -8px rgba(0, 0, 0, 0.6);
+}
+
+@keyframes mk-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(196, 181, 253, 0);
+  }
+  50% {
+    box-shadow: 0 0 32px 4px rgba(196, 181, 253, 0.45);
+  }
+}
+
+/* Card entrance cascade */
+@keyframes mk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Skeleton shimmer sweep */
+@keyframes mk-shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.explore-root {
+  /* Remap Aurora's semantic tokens so existing UI primitives go dark here. */
+  --background: var(--mk-bg);
+  --foreground: var(--mk-text);
+  --card: var(--mk-surface-1);
+  --card-foreground: var(--mk-text);
+  --popover: var(--mk-surface-2);
+  --popover-foreground: var(--mk-text);
+  --primary: var(--mk-violet);
+  --primary-foreground: #0a0a0b;
+  --secondary: var(--mk-surface-2);
+  --secondary-foreground: var(--mk-text);
+  --muted: var(--mk-surface-2);
+  --muted-foreground: var(--mk-text-muted);
+  --accent: var(--mk-surface-hover);
+  --accent-foreground: var(--mk-text);
+  --border: var(--mk-border);
+  --input: var(--mk-surface-2);
+  --ring: var(--mk-violet);
+
+  min-height: 100svh;
+  background-color: var(--mk-bg);
+  color: var(--mk-text);
+}
+
+/* Barely-there film grain for premium texture over the near-black bg. */
+.explore-root::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.035;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+@layer utilities {
+  /* Right-edge fade mask to imply more horizontally-scrollable chips. */
+  .mk-edge-fade {
+    -webkit-mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+    mask-image: linear-gradient(to right, #000 88%, transparent 100%);
+  }
+  .mk-no-scrollbar {
+    scrollbar-width: none;
+  }
+  .mk-no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}

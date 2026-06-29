@@ -1,0 +1,24 @@
+# CUDA-only dependencies. DO NOT install on macOS — these require an NVIDIA GPU.
+# Installed only on the Bengaluru 16GB box in Phase 9.
+#
+#   pip install -r requirements/gpu.txt --extra-index-url https://download.pytorch.org/whl/cu121
+#
+-r app.txt
+
+# PyTorch (CUDA 12.1 build — install via the extra index URL above)
+torch==2.5.1
+torchvision==0.20.1
+
+# Diffusion / model serving
+diffusers==0.32.1
+transformers==4.48.0
+accelerate==1.2.1
+safetensors==0.4.5
+sentencepiece==0.2.0
+
+# Memory optimization for 16GB VRAM (Phase 9 tuning)
+bitsandbytes==0.45.0
+xformers==0.0.28.post3
+
+# Music generation (optional)
+# audiocraft==1.3.0

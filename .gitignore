@@ -1,0 +1,59 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Builds
+.next/
+out/
+dist/
+build/
+*.tsbuildinfo
+
+# Env
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Data / media (never commit generated media or model weights)
+/data/
+*.mp4
+*.wav
+*.mp3
+*.png
+*.jpg
+*.jpeg
+!frontend/**/*.svg
+!**/fixtures/**
+# Intentional, self-hosted, free-license landing-page assets (see public/media/CREDITS.md)
+!frontend/public/media/
+!frontend/public/media/**
+# Intentional, self-hosted, free-license marketplace mock assets
+!frontend/public/marketplace/
+!frontend/public/marketplace/**
+models/
+*.safetensors
+*.ckpt
+*.bin
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.log
+
+# Docker / volumes
+/infra/volumes/
+
+# Test artifacts
+playwright-report/
+test-results/
+coverage/

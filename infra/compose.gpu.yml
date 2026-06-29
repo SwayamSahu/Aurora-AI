@@ -1,0 +1,37 @@
+# GPU stack — NVIDIA box (Bengaluru, 16GB VRAM), Phase 9.
+# Reuses the dev services but replaces the worker with a CUDA worker that
+# runs REAL models. The API/frontend/infra services are identical.
+#
+#   docker compose -f infra/compose.dev.yml -f infra/compose.gpu.yml up --build
+#
+# The GPU worker requires the NVIDIA Container Toolkit on the host.
+name: aurora-gpu
+
+services:
+  api:
+    environment:
+      GENERATOR_BACKEND: cuda
+
+  # Replace the mock CPU worker with the real CUDA worker.
+  worker:
+    build:
+      context: ../backend
+      dockerfile: ../infra/Dockerfile.gpu-worker
+    command: celery -A app.core.celery_app.celery_app worker --loglevel=info --concurrency=1
+    environment:
+      GENERATOR_BACKEND: cuda
+      # HuggingFace cache + model weights live on a host volume.
+      HF_HOME: /models/hf
+    volumes:
+      - ../backend:/app
+      - models:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+volumes:
+  models:

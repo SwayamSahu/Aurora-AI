@@ -1,0 +1,14 @@
+# Kokoro 82M TTS — best quality CPU voice synthesis.
+# Install when TTS_ENGINE=kokoro is configured.
+# Weight download: ~327 MB, auto-cached in $HF_HOME on first call.
+#
+#   pip install -r requirements/tts-kokoro.txt
+#
+# CPU-only torch build (~200-700 MB depending on platform):
+#   Mac (Apple Silicon):   torch is included in the standard wheel
+#   Linux (no CUDA):       pip install torch --index-url https://download.pytorch.org/whl/cpu
+#
+torch
+kokoro>=0.9.2
+misaki[en]
+soundfile
