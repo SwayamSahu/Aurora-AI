@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Wand2, Image as ImageIcon, Sparkles, Dices } from "lucide-react";
+import { Wand2, Image as ImageIcon, Sparkles, Dices, Loader2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import {
@@ -62,12 +62,31 @@ interface Props {
 
 export function PromptComposer({ state, onChange, onGenerate, busy }: Props) {
   const isVideo = state.type === "generate_video";
+  const [enhancing, setEnhancing] = React.useState(false);
 
   function togglePreset(id: string) {
     const next = new Set(state.presets);
     if (next.has(id)) next.delete(id);
     else next.add(id);
     onChange({ presets: next });
+  }
+
+  async function handleEnhance() {
+    if (!state.prompt.trim() || enhancing) return;
+    setEnhancing(true);
+    try {
+      const res = await fetch("/api/enhance-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: state.prompt, type: state.type }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        onChange({ prompt: data.enhanced });
+      }
+    } finally {
+      setEnhancing(false);
+    }
   }
 
   return (
@@ -95,13 +114,33 @@ export function PromptComposer({ state, onChange, onGenerate, busy }: Props) {
       {/* Prompt */}
       <div className="space-y-1.5">
         <Label htmlFor="prompt">Prompt</Label>
-        <Textarea
-          id="prompt"
-          value={state.prompt}
-          onChange={(e) => onChange({ prompt: e.target.value })}
-          placeholder="A cinematic drone shot over a misty forest at dawn, golden light…"
-          className="min-h-28 resize-none"
-        />
+        <div className="relative">
+          <Textarea
+            id="prompt"
+            value={state.prompt}
+            onChange={(e) => onChange({ prompt: e.target.value })}
+            placeholder="A cinematic drone shot over a misty forest at dawn, golden light…"
+            className="min-h-28 resize-none pb-9"
+          />
+          <button
+            type="button"
+            onClick={handleEnhance}
+            disabled={!state.prompt.trim() || enhancing}
+            className={cn(
+              "absolute bottom-2 left-2 flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-all",
+              "border border-border/60 bg-background/80 backdrop-blur-sm",
+              "text-muted-foreground hover:text-foreground hover:border-primary/50 hover:bg-accent/60",
+              "disabled:opacity-40 disabled:cursor-not-allowed",
+            )}
+          >
+            {enhancing ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <Sparkles className="size-3" />
+            )}
+            {enhancing ? "Enhancing…" : "Enhance prompt"}
+          </button>
+        </div>
       </div>
 
       {/* Style presets */}
