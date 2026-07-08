@@ -76,6 +76,27 @@ def client(db_session) -> Generator[TestClient, None, None]:
 
 
 @pytest.fixture()
+def sample_project(db_session):
+    """A project owned by a fresh user — for tests that hit services directly
+    (not through the HTTP client, so no auth token is needed)."""
+    from app.core.security import hash_password
+    from app.db.models import Project, User
+
+    user = User(
+        email="editor@example.com",
+        hashed_password=hash_password("supersecret1"),
+        full_name="Editor",
+    )
+    db_session.add(user)
+    db_session.commit()
+    project = Project(owner_id=user.id, name="Edit test project")
+    db_session.add(project)
+    db_session.commit()
+    db_session.refresh(project)
+    return project
+
+
+@pytest.fixture()
 def auth_headers(client: TestClient) -> dict[str, str]:
     """Register a user and return an Authorization header for them."""
     client.post(

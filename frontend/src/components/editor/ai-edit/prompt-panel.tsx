@@ -32,12 +32,21 @@ const MASK_MODE_HINT: Record<string, string> = {
  * Right-hand AI Edit panel: preset catalog + prompt box + apply. In E1 the
  * apply step queues a local draft (the edit-layer backend lands in E2).
  */
+export interface AppliedEdit {
+  engine: string;
+  presetId: string;
+  label: string;
+  prompt: string;
+}
+
 export function PromptPanel({
   hasInk,
-  onApplied,
+  applying,
+  onApply,
 }: {
   hasInk: boolean;
-  onApplied: (summary: string) => void;
+  applying: boolean;
+  onApply: (edit: AppliedEdit) => void;
 }) {
   const [preset, setPreset] = React.useState<EditPreset | null>(null);
   const [text, setText] = React.useState("");
@@ -57,8 +66,12 @@ export function PromptPanel({
       toast.error("Describe the change in the prompt box.");
       return;
     }
-    const finalPrompt = resolvePrompt(activePreset, text);
-    onApplied(`${activePreset.label}: ${finalPrompt}`);
+    onApply({
+      engine: activePreset.engine,
+      presetId: activePreset.id,
+      label: activePreset.label,
+      prompt: resolvePrompt(activePreset, text),
+    });
     setText("");
   }
 
@@ -98,7 +111,7 @@ export function PromptPanel({
         />
       </div>
 
-      <Button className="w-full" onClick={apply}>
+      <Button className="w-full" onClick={apply} loading={applying}>
         Apply edit
       </Button>
       <p className="text-center text-[11px] text-muted-foreground">

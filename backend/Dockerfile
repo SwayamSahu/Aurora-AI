@@ -6,9 +6,10 @@ ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1
 
-# FFmpeg for media processing; espeak-ng for CPU text-to-speech on Linux.
+# FFmpeg for media processing; espeak-ng for CPU text-to-speech on Linux;
+# tesseract-ocr for real on-screen text detection (AI Edit's text-detect).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ffmpeg espeak-ng \
+    && apt-get install -y --no-install-recommends ffmpeg espeak-ng tesseract-ocr \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

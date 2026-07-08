@@ -157,7 +157,7 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
             </Card>
 
             {mode === "ai-edit" ? (
-              <AiEditWorkspace />
+              <AiEditWorkspace projectId={projectId} />
             ) : (
               <>
                 <PreviewCanvas />

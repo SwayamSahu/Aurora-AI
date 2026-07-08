@@ -93,6 +93,40 @@ class MusicGenParams:
     duration_seconds: float = 10.0
 
 
+# The engine primitives the video editor understands (see the AI Edit plan).
+EditEngine = Literal[
+    "segment-track",
+    "inpaint-remove",
+    "masked-v2v",
+    "global-restyle",
+    "enhance",
+    "retime-camera",
+    "text-ops",
+]
+
+
+@dataclass
+class VideoEditParams:
+    """A single non-destructive edit applied to one source clip.
+
+    The source clip bytes and an optional mask (PNG, white = edit region) are
+    passed in; the editor returns a new video. `engine` selects the primitive,
+    `params` carries engine-specific knobs (strength, factor, …).
+    """
+
+    source: bytes
+    source_content_type: str
+    engine: EditEngine
+    prompt: str = ""
+    mask: bytes | None = None
+    params: dict = field(default_factory=dict)
+    # Identifies which catalog preset was applied (see frontend presets.ts).
+    # Deterministic engines (retime, color grade, OCR) key their real,
+    # non-generative recipes off this id; unmatched ids fall back to the
+    # generic stand-in filter for that engine.
+    preset_id: str | None = None
+
+
 # --------------------------------------------------------------------------- #
 # Interfaces
 # --------------------------------------------------------------------------- #
@@ -148,6 +182,21 @@ class MusicGenerator(Generator):
     def generate(
         self,
         params: MusicGenParams,
+        progress: ProgressCallback = _noop_progress,
+    ) -> GeneratedMedia: ...
+
+
+class VideoEditor(Generator):
+    """Applies a single AI edit to a source clip (mask-aware).
+
+    Mock implementation uses real FFmpeg transforms so before/after is visible
+    on the Mac; the CUDA implementation swaps in real models on the GPU box.
+    """
+
+    @abstractmethod
+    def edit(
+        self,
+        params: VideoEditParams,
         progress: ProgressCallback = _noop_progress,
     ) -> GeneratedMedia: ...
 

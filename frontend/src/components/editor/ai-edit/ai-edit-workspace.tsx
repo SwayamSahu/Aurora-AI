@@ -2,29 +2,42 @@
 
 import * as React from "react";
 import { toast } from "sonner";
-import { Layers, X } from "lucide-react";
 
 import { useEditorStore } from "@/lib/editor/store";
 import { findClip } from "@/lib/editor/helpers";
+import { assetContentUrl } from "@/lib/api/assets";
+import { ApiError } from "@/lib/api/client";
 import {
   type SelectionTool,
   type BrushSettings,
   DEFAULT_BRUSH,
+  exportMask,
 } from "@/lib/editor/ai-edit/mask";
+import type { EditLayer } from "@/lib/editor/ai-edit/api";
+import {
+  useCreateEdit,
+  useEditLayers,
+} from "@/lib/editor/ai-edit/queries";
 import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAsset } from "@/components/editor/assets-context";
 import {
   EditCanvas,
   type EditCanvasHandle,
 } from "@/components/editor/ai-edit/edit-canvas";
 import { SelectionTools } from "@/components/editor/ai-edit/selection-tools";
 import { BrushControls } from "@/components/editor/ai-edit/brush-controls";
-import { PromptPanel } from "@/components/editor/ai-edit/prompt-panel";
-
-interface DraftEdit {
-  id: string;
-  summary: string;
-}
+import {
+  PromptPanel,
+  type AppliedEdit,
+} from "@/components/editor/ai-edit/prompt-panel";
+import { EditLayersPanel } from "@/components/editor/ai-edit/edit-layers-panel";
+import { CompareSlider } from "@/components/editor/ai-edit/compare-slider";
 
 function isTypingTarget(el: EventTarget | null): boolean {
   const node = el as HTMLElement | null;
@@ -38,23 +51,22 @@ function isTypingTarget(el: EventTarget | null): boolean {
   );
 }
 
-/**
- * The AI Edit mode workspace: canvas + tool strip in the center column,
- * prompt/preset panel on the right. Draft edit layers are kept locally in
- * E1; they become persisted, rendered layers in E2.
- */
-export function AiEditWorkspace() {
+export function AiEditWorkspace({ projectId }: { projectId: string }) {
   const document_ = useEditorStore((s) => s.document);
   const selectedClipId = useEditorStore((s) => s.selectedClipId);
   const clip = selectedClipId ? findClip(document_, selectedClipId) : undefined;
+  const clipAsset = useAsset(clip?.asset_id);
 
   const [tool, setTool] = React.useState<SelectionTool>("brush");
   const [brush, setBrush] = React.useState<BrushSettings>(DEFAULT_BRUSH);
   const [hasInk, setHasInk] = React.useState(false);
-  const [drafts, setDrafts] = React.useState<DraftEdit[]>([]);
+  const [compare, setCompare] = React.useState<EditLayer | null>(null);
   const canvasRef = React.useRef<EditCanvasHandle>(null);
 
-  // Tool shortcuts (B/E/L/R/O, [ ] size) — only while AI Edit is mounted.
+  const layersQuery = useEditLayers(projectId, clip?.id);
+  const createEdit = useCreateEdit(projectId, clip?.id);
+
+  // Tool shortcuts (B/E/L/R/O, [ ] size).
   React.useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey) return;
@@ -95,6 +107,36 @@ export function AiEditWorkspace() {
     );
   }
 
+  async function onApply(edit: AppliedEdit) {
+    if (!clip?.asset_id) {
+      toast.error("This clip has no source media to edit.");
+      return;
+    }
+    // Send the painted mask only when there's ink (auto/full-frame presets
+    // without a painted region run full-frame on the backend).
+    let maskBase64: string | null = null;
+    const mask = canvasRef.current?.getMaskCanvas();
+    if (hasInk && mask) maskBase64 = exportMask(mask);
+
+    try {
+      await createEdit.mutateAsync({
+        clip_id: clip.id,
+        engine: edit.engine,
+        preset_id: edit.presetId,
+        label: edit.label,
+        prompt: edit.prompt,
+        source_asset_id: clip.asset_id,
+        mask_base64: maskBase64,
+      });
+      canvasRef.current?.clear();
+      toast.success("Edit queued — processing on the render backend.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Couldn't queue edit.");
+    }
+  }
+
+  const layers = layersQuery.data ?? [];
+
   return (
     <>
       {/* Center: canvas + tool strip */}
@@ -119,35 +161,12 @@ export function AiEditWorkspace() {
           onInkChange={setHasInk}
         />
 
-        {/* Draft layers (local in E1) */}
-        {drafts.length > 0 ? (
-          <div className="rounded-lg border bg-card p-3">
-            <p className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-              <Layers className="size-3.5" /> Edit layers · {drafts.length}
-            </p>
-            <ul className="space-y-1.5">
-              {drafts.map((d) => (
-                <li
-                  key={d.id}
-                  className="flex items-center justify-between gap-2 rounded-md bg-accent/40 px-2.5 py-1.5 text-xs"
-                >
-                  <span className="truncate">{d.summary}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Remove draft edit"
-                    className="size-6 shrink-0"
-                    onClick={() =>
-                      setDrafts((ds) => ds.filter((x) => x.id !== d.id))
-                    }
-                  >
-                    <X className="size-3.5" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
+        <EditLayersPanel
+          projectId={projectId}
+          clipId={clip.id}
+          layers={layers}
+          onCompare={setCompare}
+        />
       </div>
 
       {/* Right: prompt/preset panel */}
@@ -155,19 +174,30 @@ export function AiEditWorkspace() {
         <CardContent className="p-4">
           <PromptPanel
             hasInk={hasInk}
-            onApplied={(summary) => {
-              setDrafts((ds) => [
-                ...ds,
-                { id: `draft-${Date.now()}`, summary },
-              ]);
-              canvasRef.current?.clear();
-              toast.success(
-                "Edit queued as a draft layer. Rendering lands with the edit backend (E2).",
-              );
-            }}
+            applying={createEdit.isPending}
+            onApply={onApply}
           />
+          <p className="mt-2 text-center text-[11px] text-muted-foreground">
+            Tip: paint a region for local edits, or apply a preset to the whole
+            clip.
+          </p>
         </CardContent>
       </Card>
+
+      {/* Before/after compare */}
+      <Dialog open={!!compare} onOpenChange={(o) => !o && setCompare(null)}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>{compare?.label || "Compare"}</DialogTitle>
+          </DialogHeader>
+          {compare?.result_asset && clipAsset ? (
+            <CompareSlider
+              beforeUrl={assetContentUrl(clipAsset)}
+              afterUrl={assetContentUrl(compare.result_asset)}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }

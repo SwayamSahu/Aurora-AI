@@ -8,6 +8,7 @@ asset on the job.
 
 from __future__ import annotations
 
+import copy
 import os
 import tempfile
 from pathlib import Path
@@ -18,20 +19,45 @@ from app.db.models import Asset, Job, Project
 from app.db.models.asset import AssetKind, AssetSource
 from app.db.models.job import JobStatus
 from app.media.ffmpeg_pipeline import RenderParams, build_render_plan, render_to_mp4
-from app.services import asset_service, job_service, timeline_service
+from app.services import (
+    asset_service,
+    edit_service,
+    job_service,
+    timeline_service,
+)
 from app.storage import get_storage
 
-_SUPPORTED_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".webm", ".wav", ".mp3", ".ogg", ".m4a", ".png", ".jpg", ".jpeg"}
+_SUPPORTED_EXTS = {
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".mkv",
+    ".webm",
+    ".wav",
+    ".mp3",
+    ".ogg",
+    ".m4a",
+    ".png",
+    ".jpg",
+    ".jpeg",
+}
 
 
 def _ext_for_content_type(ct: str) -> str:
     ct = ct.lower().split(";")[0].strip()
     _MAP = {
-        "video/mp4": ".mp4", "video/quicktime": ".mov", "video/webm": ".webm",
-        "video/x-matroska": ".mkv", "video/avi": ".avi",
-        "audio/wav": ".wav", "audio/mpeg": ".mp3", "audio/mp4": ".m4a",
+        "video/mp4": ".mp4",
+        "video/quicktime": ".mov",
+        "video/webm": ".webm",
+        "video/x-matroska": ".mkv",
+        "video/avi": ".avi",
+        "audio/wav": ".wav",
+        "audio/mpeg": ".mp3",
+        "audio/mp4": ".m4a",
         "audio/ogg": ".ogg",
-        "image/png": ".png", "image/jpeg": ".jpg", "image/gif": ".gif",
+        "image/png": ".png",
+        "image/jpeg": ".jpg",
+        "image/gif": ".gif",
         "image/webp": ".webp",
     }
     return _MAP.get(ct, ".bin")
@@ -69,6 +95,20 @@ def run_export(db: Session, job: Job) -> Job:
         job_service.mark_failed(db, job, f"Could not load timeline: {exc}")
         return job
 
+    # --- Substitute AI-edited results (E2) ---
+    # For each clip that has an enabled, succeeded edit layer, render the edited
+    # asset instead of the original. Works on a copy so the stored timeline is
+    # untouched (edits stay non-destructive).
+    document = copy.deepcopy(document)
+    for track in document.get("tracks", []):
+        for clip in track.get("clips", []):
+            clip_id = clip.get("id")
+            if not clip_id or not clip.get("asset_id"):
+                continue
+            edited = edit_service.top_result_asset_id(db, project.id, clip_id)
+            if edited:
+                clip["asset_id"] = edited
+
     # --- Resolve all referenced asset IDs ---
     asset_ids: set[str] = set()
     for track in document.get("tracks", []):
@@ -104,7 +144,9 @@ def run_export(db: Session, job: Job) -> Job:
 
         # --- Render ---
         output_path = os.path.join(tmpdir, "export.mp4")
-        render_to_mp4(plan, output_path, progress=lambda f, m="": progress(0.2 + f * 0.7, m))
+        render_to_mp4(
+            plan, output_path, progress=lambda f, m="": progress(0.2 + f * 0.7, m)
+        )
 
         # --- Upload the result ---
         progress(0.95, "uploading")
@@ -125,6 +167,7 @@ def run_export(db: Session, job: Job) -> Job:
     finally:
         # Clean up temp files.
         import shutil
+
         shutil.rmtree(tmpdir, ignore_errors=True)
 
     return job

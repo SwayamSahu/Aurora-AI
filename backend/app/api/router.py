@@ -8,6 +8,7 @@ from app.api.routes import (
     assets,
     audio,
     auth,
+    edits,
     export,
     health,
     jobs,
@@ -24,6 +25,7 @@ api_router.include_router(users.router)
 api_router.include_router(projects.router)
 api_router.include_router(assets.router)
 api_router.include_router(jobs.router)
+api_router.include_router(edits.router)
 api_router.include_router(timeline.router)
 api_router.include_router(audio.router)
 api_router.include_router(export.router)

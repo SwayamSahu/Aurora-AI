@@ -11,5 +11,10 @@ Pillow==10.4.0
 faster-whisper==1.1.1
 requests==2.32.3
 
+# On-screen text detection for AI Edit's "text-detect" preset — CPU-capable
+# Tesseract OCR, real on Mac & Linux. Needs the `tesseract-ocr` system
+# package (see Dockerfile).
+pytesseract==0.3.13
+
 # Text-to-speech (Phase 6) uses OS-native engines (macOS `say`, Linux
 # `espeak-ng`) — no Python package needed. Piper is a future quality upgrade.

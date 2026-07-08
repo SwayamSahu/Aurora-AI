@@ -18,6 +18,7 @@ from app.generators.base import (
     ImageToVideoGenerator,
     MusicGenerator,
     Transcriber,
+    VideoEditor,
     VideoGenerator,
     VoiceGenerator,
 )
@@ -26,6 +27,7 @@ from app.generators.mock import (
     MockImageToVideoGenerator,
     MockMusicGenerator,
     MockTranscriber,
+    MockVideoEditor,
     MockVideoGenerator,
     MockVoiceGenerator,
 )
@@ -96,6 +98,18 @@ def get_transcriber() -> Transcriber:
         if real is not None:
             return real
     return MockTranscriber()
+
+
+@lru_cache
+def get_video_editor() -> VideoEditor:
+    backend = settings.generator_backend
+    if backend == GeneratorBackend.MOCK:
+        return MockVideoEditor()
+    if backend == GeneratorBackend.CUDA:
+        from app.generators.cuda import CudaVideoEditor  # noqa: PLC0415
+
+        return CudaVideoEditor()
+    _cuda_not_ready("video editor")
 
 
 @lru_cache

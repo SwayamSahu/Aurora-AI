@@ -14,7 +14,11 @@ celery_app = Celery(
     "aurora",
     broker=settings.celery_broker_url,
     backend=settings.celery_result_backend,
-    include=["app.workers.generation_tasks", "app.workers.export_tasks"],
+    include=[
+        "app.workers.generation_tasks",
+        "app.workers.export_tasks",
+        "app.workers.edit_tasks",
+    ],
 )
 
 celery_app.conf.update(
