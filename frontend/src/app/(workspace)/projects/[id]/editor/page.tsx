@@ -24,6 +24,11 @@ import { AssetTray } from "@/components/editor/asset-tray";
 import { AiPanel } from "@/components/editor/ai-panel";
 import { ExportDialog } from "@/components/editor/export-dialog";
 import { Separator } from "@/components/ui/separator";
+import {
+  EditModeSwitcher,
+  type EditorMode,
+} from "@/components/editor/ai-edit/edit-mode-switcher";
+import { AiEditWorkspace } from "@/components/editor/ai-edit/ai-edit-workspace";
 
 function isTypingTarget(el: EventTarget | null): boolean {
   const node = el as HTMLElement | null;
@@ -41,6 +46,7 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
   const project = useProject(projectId);
   const assets = useAssets(projectId);
   const [exporting, setExporting] = React.useState(false);
+  const [mode, setMode] = React.useState<EditorMode>("timeline");
 
   const load = useEditorStore((s) => s.load);
   const loaded = useEditorStore((s) => s.loaded);
@@ -119,9 +125,13 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
             <ArrowLeft className="size-4" /> {project.data?.name ?? "Project"}
           </Link>
         </Button>
+        <EditModeSwitcher mode={mode} onMode={setMode} />
       </div>
 
-      <EditorToolbar onExport={() => setExporting(true)} />
+      <EditorToolbar
+        onExport={() => setExporting(true)}
+        onAddText={() => setMode("timeline")}
+      />
 
       {!ready ? (
         <div className="mt-4 space-y-4">
@@ -146,13 +156,19 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
               </CardContent>
             </Card>
 
-            <PreviewCanvas />
+            {mode === "ai-edit" ? (
+              <AiEditWorkspace />
+            ) : (
+              <>
+                <PreviewCanvas />
 
-            <Card>
-              <CardContent className="p-4">
-                <Inspector />
-              </CardContent>
-            </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <Inspector />
+                  </CardContent>
+                </Card>
+              </>
+            )}
           </div>
 
           <div className="mt-4">

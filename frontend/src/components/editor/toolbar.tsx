@@ -74,9 +74,13 @@ function SaveIndicator() {
 
 interface EditorToolbarProps {
   onExport?: () => void;
+  /** Called after a text clip is added — lets the page switch to Timeline
+   * mode so the new clip is visible and editable (AI Edit mode has no
+   * preview/inspector for non-video clips). */
+  onAddText?: () => void;
 }
 
-export function EditorToolbar({ onExport }: EditorToolbarProps) {
+export function EditorToolbar({ onExport, onAddText }: EditorToolbarProps) {
   const addTextClip = useEditorStore((s) => s.addTextClip);
   const splitAtPlayhead = useEditorStore((s) => s.splitAtPlayhead);
   const duplicateSelected = useEditorStore((s) => s.duplicateSelected);
@@ -91,7 +95,13 @@ export function EditorToolbar({ onExport }: EditorToolbarProps) {
 
   return (
     <div className="flex items-center gap-1 rounded-lg border border-border bg-card px-2 py-1.5">
-      <ToolButton label="Add text" onClick={addTextClip}>
+      <ToolButton
+        label="Add text"
+        onClick={() => {
+          addTextClip();
+          onAddText?.();
+        }}
+      >
         <Type className="size-4" />
       </ToolButton>
       <ToolButton
