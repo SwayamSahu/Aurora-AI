@@ -6,6 +6,7 @@ import {
   Lasso,
   Square,
   Circle,
+  MousePointerClick,
   Trash2,
 } from "lucide-react";
 
@@ -19,6 +20,7 @@ import {
 } from "@/components/ui/tooltip";
 
 const TOOLS: { id: SelectionTool; label: string; keys: string; icon: typeof Brush }[] = [
+  { id: "select", label: "Click to select", keys: "V", icon: MousePointerClick },
   { id: "brush", label: "AI Pencil (brush)", keys: "B", icon: Brush },
   { id: "eraser", label: "Eraser", keys: "E", icon: Eraser },
   { id: "lasso", label: "Lasso", keys: "L", icon: Lasso },

@@ -50,6 +50,11 @@ MODELS = [
     ("stabilityai/stable-video-diffusion-img2vid-xt", "SVD-XT     (image→video, ~7 GB)"),
     ("black-forest-labs/FLUX.1-dev",                  "FLUX.1-dev (text→image, ~23 GB)"),
     ("facebook/musicgen-small",                       "MusicGen   (music, ~300 MB)"),
+    # AI Edit (E5)
+    ("runwayml/stable-diffusion-inpainting",          "SD-Inpaint (object removal, ~4 GB)"),
+    ("stabilityai/stable-diffusion-2-1",              "SD-2.1     (masked v2v / restyle, ~5 GB)"),
+    ("IDEA-Research/grounding-dino-tiny",             "GroundingDINO (text→boxes, ~700 MB)"),
+    ("facebook/sam2-hiera-large",                     "SAM 2      (click→mask, ~900 MB)"),
 ]
 
 failed = []

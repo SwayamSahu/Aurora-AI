@@ -202,6 +202,55 @@ class VideoEditor(Generator):
 
 
 # --------------------------------------------------------------------------- #
+# Object detection / tracking (P1 — segment-track)
+# --------------------------------------------------------------------------- #
+@dataclass
+class DetectParams:
+    """A single detection request against one frame of a clip.
+
+    `mode="click"` asks "what's at this point?" (x, y normalized 0-1).
+    `mode="text"` asks "find every X" and may return several candidates.
+    """
+
+    mode: Literal["click", "text"]
+    x: float | None = None
+    y: float | None = None
+    query: str | None = None
+    # The clip's source video bytes. Optional because the mock detector doesn't
+    # need them; real backends (SAM 2 / GroundingDINO) require a frame to run on
+    # and the detect route attaches these when a source asset is given.
+    source: bytes | None = None
+
+
+@dataclass
+class DetectedObject:
+    """A candidate object: a normalized (0-1) bounding box + label.
+
+    Real backends additionally resolve a per-frame masklet for tracking
+    across time; the mock backend returns a static box only.
+    """
+
+    label: str
+    x: float
+    y: float
+    w: float
+    h: float
+    confidence: float = 1.0
+
+
+class ObjectDetector(Generator):
+    """Finds candidate objects to select for editing (click or text query).
+
+    Mock implementation returns deterministic, plausible boxes so the
+    click-to-select and "select all X" UX can be built and tested before
+    Phase 9 swaps in real segmentation (SAM 2 + GroundingDINO).
+    """
+
+    @abstractmethod
+    def detect(self, params: DetectParams) -> list[DetectedObject]: ...
+
+
+# --------------------------------------------------------------------------- #
 # Transcription (speech-to-text for auto-subtitles)
 # --------------------------------------------------------------------------- #
 @dataclass

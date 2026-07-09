@@ -17,6 +17,7 @@ from app.generators.base import (
     ImageGenerator,
     ImageToVideoGenerator,
     MusicGenerator,
+    ObjectDetector,
     Transcriber,
     VideoEditor,
     VideoGenerator,
@@ -26,6 +27,7 @@ from app.generators.mock import (
     MockImageGenerator,
     MockImageToVideoGenerator,
     MockMusicGenerator,
+    MockObjectDetector,
     MockTranscriber,
     MockVideoEditor,
     MockVideoGenerator,
@@ -110,6 +112,18 @@ def get_video_editor() -> VideoEditor:
 
         return CudaVideoEditor()
     _cuda_not_ready("video editor")
+
+
+@lru_cache
+def get_object_detector() -> ObjectDetector:
+    backend = settings.generator_backend
+    if backend == GeneratorBackend.MOCK:
+        return MockObjectDetector()
+    if backend == GeneratorBackend.CUDA:
+        from app.generators.cuda import CudaObjectDetector  # noqa: PLC0415
+
+        return CudaObjectDetector()
+    _cuda_not_ready("object detector")
 
 
 @lru_cache

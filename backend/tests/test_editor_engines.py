@@ -182,6 +182,47 @@ def test_camera_modes_succeed(db_session, sample_project):
 
 
 # --------------------------------------------------------------------------- #
+# Masked edit — the maskedmerge path (mask sized differently from the source)
+# --------------------------------------------------------------------------- #
+
+
+def test_masked_edit_with_offsize_mask_succeeds(db_session, sample_project):
+    """A painted mask is authored at a fixed canvas size that rarely matches
+    the source video. The editor must scale it (scale2ref) before merging —
+    regression test for the maskedmerge dimension-mismatch bug."""
+    import base64
+    import io
+
+    from PIL import Image
+
+    source = _make_video_asset(db_session, sample_project)
+
+    # 1280x720 mask (deliberately unlike the fixture's resolution): black with
+    # a white rectangle marking the edit region.
+    mask = Image.new("L", (1280, 720), color=0)
+    for y in range(200, 500):
+        for x in range(300, 800):
+            mask.putpixel((x, y), 255)
+    buf = io.BytesIO()
+    mask.save(buf, format="PNG")
+    mask_b64 = base64.b64encode(buf.getvalue()).decode()
+
+    layer = _create_layer(
+        db_session,
+        sample_project,
+        source,
+        engine="masked-v2v",
+        preset_id="recolor",
+        clip_id="masked-clip",
+    )
+    run_edit(db_session, layer, mask_base64=mask_b64)
+    db_session.refresh(layer)
+    assert layer.status == EditLayerStatus.SUCCEEDED, layer.error
+    assert layer.result_asset_id is not None
+    assert layer.mask_storage_key is not None
+
+
+# --------------------------------------------------------------------------- #
 # Color grading — real, distinct per preset (not one-size-fits-all)
 # --------------------------------------------------------------------------- #
 

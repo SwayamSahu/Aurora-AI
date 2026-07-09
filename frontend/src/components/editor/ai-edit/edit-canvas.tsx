@@ -2,12 +2,15 @@
 
 import * as React from "react";
 
+import { X } from "lucide-react";
+
 import type { Clip } from "@/lib/api/timeline";
 import { assetContentUrl } from "@/lib/api/assets";
 import { useAsset } from "@/components/editor/assets-context";
 import {
   type SelectionTool,
   type BrushSettings,
+  type TrackedObject,
   MASK_TINT,
   clearMask,
   maskHasInk,
@@ -20,6 +23,9 @@ const MASK_H = 720;
 export interface EditCanvasHandle {
   getMaskCanvas: () => HTMLCanvasElement | null;
   clear: () => void;
+  /** Fills a normalized (0-1) rectangle into the mask — used to paint a
+   * detected object's bounding box after click-to-select / "select all X". */
+  paintRect: (xNorm: number, yNorm: number, wNorm: number, hNorm: number) => void;
 }
 
 interface Point {
@@ -39,8 +45,17 @@ export const EditCanvas = React.forwardRef<
     tool: SelectionTool;
     brush: BrushSettings;
     onInkChange: (hasInk: boolean) => void;
+    /** Fires on a plain click while the "select" tool is active, with
+     * normalized (0-1) coordinates — used for click-to-select. */
+    onSelectClick?: (xNorm: number, yNorm: number) => void;
+    /** Detected/tracked object chips overlaid on the canvas. */
+    objects?: TrackedObject[];
+    onRemoveObject?: (id: string) => void;
   }
->(function EditCanvas({ clip, tool, brush, onInkChange }, ref) {
+>(function EditCanvas(
+  { clip, tool, brush, onInkChange, onSelectClick, objects = [], onRemoveObject },
+  ref,
+) {
   const asset = useAsset(clip.asset_id);
   const displayRef = React.useRef<HTMLCanvasElement>(null);
   const maskRef = React.useRef<HTMLCanvasElement | null>(null);
@@ -64,6 +79,24 @@ export const EditCanvas = React.forwardRef<
       if (maskRef.current) clearMask(maskRef.current);
       repaint();
       onInkChange(false);
+    },
+    paintRect: (xNorm, yNorm, wNorm, hNorm) => {
+      const mask = maskRef.current;
+      if (!mask) return;
+      const ctx = mask.getContext("2d");
+      if (!ctx) return;
+      ctx.save();
+      ctx.globalAlpha = brush.opacity;
+      ctx.fillStyle = "#8b5cf6";
+      ctx.fillRect(
+        xNorm * MASK_W,
+        yNorm * MASK_H,
+        wNorm * MASK_W,
+        hNorm * MASK_H,
+      );
+      ctx.restore();
+      repaint();
+      onInkChange(maskHasInk(mask));
     },
   }));
 
@@ -256,6 +289,16 @@ export const EditCanvas = React.forwardRef<
   function onPointerUp(e: React.PointerEvent) {
     if (!drawing.current) return;
     drawing.current = false;
+    if (tool === "select") {
+      const rect = displayRef.current!.getBoundingClientRect();
+      onSelectClick?.(
+        (e.clientX - rect.left) / rect.width,
+        (e.clientY - rect.top) / rect.height,
+      );
+      lastPt.current = null;
+      startPt.current = null;
+      return;
+    }
     const p = toMask(e);
     if (tool === "rect" || tool === "ellipse" || tool === "lasso") {
       commitShape(startPt.current!, p);
@@ -296,12 +339,46 @@ export const EditCanvas = React.forwardRef<
         role="img"
         aria-label="Mask painting canvas"
         className="absolute inset-0 size-full touch-none"
-        style={{ cursor: showBrushCursor ? "none" : "crosshair" }}
+        style={{
+          cursor: showBrushCursor
+            ? "none"
+            : tool === "select"
+              ? "pointer"
+              : "crosshair",
+        }}
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerLeave={() => setCursor(null)}
       />
+
+      {/* Detected/tracked object chips */}
+      {objects.map((obj) => (
+        <div
+          key={obj.id}
+          className="pointer-events-none absolute rounded-md border-2 border-primary/80"
+          style={{
+            left: `${obj.x * 100}%`,
+            top: `${obj.y * 100}%`,
+            width: `${obj.w * 100}%`,
+            height: `${obj.h * 100}%`,
+          }}
+        >
+          <div className="pointer-events-auto absolute -top-6 left-0 inline-flex items-center gap-1 rounded-t-md bg-primary px-1.5 py-0.5 text-[10px] font-medium text-primary-foreground">
+            {obj.label}
+            {onRemoveObject ? (
+              <button
+                type="button"
+                aria-label={`Remove ${obj.label}`}
+                onClick={() => onRemoveObject(obj.id)}
+                className="rounded-sm hover:bg-black/20"
+              >
+                <X className="size-3" />
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ))}
 
       {/* Brush size cursor */}
       {showBrushCursor && cursor ? (

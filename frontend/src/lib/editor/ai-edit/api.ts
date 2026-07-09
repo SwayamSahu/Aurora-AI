@@ -46,10 +46,6 @@ export function listEdits(projectId: string, clipId: string) {
   );
 }
 
-export function getEdit(layerId: string) {
-  return apiFetch<EditLayer>(`/edits/${layerId}`);
-}
-
 export function patchEdit(
   layerId: string,
   patch: { enabled?: boolean; position?: number; prompt?: string },
@@ -62,4 +58,32 @@ export function patchEdit(
 
 export function deleteEdit(layerId: string) {
   return apiFetch<void>(`/edits/${layerId}`, { method: "DELETE" });
+}
+
+export interface DetectedObject {
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  confidence: number;
+}
+
+export type DetectInput =
+  | { mode: "click"; x: number; y: number }
+  | { mode: "text"; query: string };
+
+/**
+ * `assetId` is the clip's source asset — real (CUDA) detection runs on its
+ * first frame. Harmless for the mock backend, which ignores it.
+ */
+export function detectObjects(
+  projectId: string,
+  input: DetectInput,
+  assetId?: string | null,
+) {
+  return apiFetch<DetectedObject[]>(`/projects/${projectId}/detect-objects`, {
+    method: "POST",
+    json: { ...input, asset_id: assetId ?? null },
+  });
 }

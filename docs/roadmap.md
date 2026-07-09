@@ -145,3 +145,29 @@ GPU model integration and testing (Phase 9) happen on the NVIDIA 16GB box via RD
 - [x] Clip block keyboard accessibility: `onKeyDown` Delete/Backspace removes clip; `aria-label` with kind + name + duration
 - [x] Transition badge: tiny pill on clip bottom-left shows transition type (e.g. "fade") when set
 - [x] Test gate: **85 backend + 13 frontend unit tests pass**; ruff + lint/typecheck/build green
+
+## AI Edit workspace (Runway/Pika-class in-editor editing)
+
+Prompt- and mask-driven editing inside the editor page (`/projects/[id]/editor`,
+"AI Edit" mode). ~29 spec feature families collapse onto 8 engine primitives; a
+data-driven preset catalog (~120 presets) sits on top. Mock-first on Mac, CUDA
+on the NVIDIA box.
+
+| Sub-phase | Scope | Runs on | Status |
+|-----------|-------|---------|--------|
+| **E1** | Mode switcher, mask canvas (brush/eraser/lasso/rect/ellipse), preset catalog, prompt panel | Mac | ✅ done |
+| **E2** | `edit_layers` model+API+Celery, mock editor (real FFmpeg), layers panel, before/after slider, export substitution | Mac | ✅ done |
+| **E3** | Real retime/camera (FFmpeg), real color grading (18 lighting/time/season recipes), OCR text-detect (Tesseract) | Mac (real) | ✅ done |
+| **E4** | Tracking UX: click-to-select, "select all X", object chips, per-object presence ranges (mock detector) | Mac | ✅ done |
+| **E5** | CUDA editor (SD inpaint/img2img, Real-ESRGAN) + detector (SAM 2, GroundingDINO) — **code written, GPU-run deferred** | NVIDIA (RDP) | 🟡 written, not run |
+| E6 | Face swap + human replacement behind a consent gate; batch multi-clip; export presets | NVIDIA (RDP) | ⬜ |
+
+### E5 — Definition of done (GPU code written; runs in Phase 9)
+- [x] `VideoEditor` + `ObjectDetector` contracts; `get_video_editor()` / `get_object_detector()` registry entries
+- [x] `CudaVideoEditor` (`generators/cuda/editor.py`): SD inpaint (remove), SD img2img (masked v2v / restyle), Real-ESRGAN (enhance); non-generative engines (retime, color grade, OCR) delegate to the shared FFmpeg/Tesseract impl
+- [x] `CudaObjectDetector` (`generators/cuda/detector.py`): SAM 2 click→mask→bbox, GroundingDINO text→boxes
+- [x] All GPU imports lazy → **importable on CPU-only Mac** (verified: no torch installed, classes import, registry still resolves mock)
+- [x] `gpu.txt` + `download_gpu_models.sh` extended (SD-inpaint, SD-2.1, GroundingDINO, SAM 2); SAM 2 / ProPainter noted as GitHub installs
+- [x] Detect route attaches clip source bytes so real backends have a frame; mock ignores them
+- [x] Test gate: **106 backend tests pass** (incl. 4 E5: CPU-only import, FFmpeg-delegated retime + grade run on Mac, detector source guard); ruff + format clean
+- [ ] **Deferred to Phase 9 (NVIDIA box):** real inference, 16 GB VRAM tuning, temporal-coherence upgrade (Wan 2.1 VACE / AnimateDiff), GPU E2E

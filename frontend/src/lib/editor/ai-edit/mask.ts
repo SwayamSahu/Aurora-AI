@@ -10,7 +10,24 @@ export type SelectionTool =
   | "eraser"
   | "lasso"
   | "rect"
-  | "ellipse";
+  | "ellipse"
+  | "select";
+
+/** A detected/tracked object overlaid on the canvas — normalized 0-1 bbox. */
+export interface TrackedObject {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  confidence: number;
+  /** Manually-set presence range within the clip (seconds). Mock tracking
+   * has no real per-frame presence data, so this starts as the full clip
+   * duration and the user can narrow it — see tracking-panel.tsx. */
+  startTime: number;
+  endTime: number;
+}
 
 export interface BrushSettings {
   /** Diameter in mask-space pixels. */
@@ -45,22 +62,34 @@ export function maskHasInk(mask: HTMLCanvasElement): boolean {
   return false;
 }
 
-/** Export the painted mask as a black/white PNG data URL. */
-export function exportMask(mask: HTMLCanvasElement): string {
+/**
+ * Export the painted mask as an opaque black/white PNG data URL:
+ * white (edit region) where painted, black elsewhere. `feather` softens the
+ * edge (mask-space px) so the backend gets a grayscale falloff and blends the
+ * edit smoothly rather than with a hard cut.
+ */
+export function exportMask(mask: HTMLCanvasElement, feather = 0): string {
   const out = document.createElement("canvas");
   out.width = mask.width;
   out.height = mask.height;
   const ctx = out.getContext("2d");
   if (!ctx) return "";
-  ctx.fillStyle = "#000";
-  ctx.fillRect(0, 0, out.width, out.height);
-  // Paint alpha → white.
-  ctx.save();
+
+  // 1. Draw the painted alpha (optionally blurred for feathering).
+  if (feather > 0) ctx.filter = `blur(${feather}px)`;
   ctx.drawImage(mask, 0, 0);
+  ctx.filter = "none";
+
+  // 2. Turn the painted alpha into white, keeping its (feathered) alpha.
   ctx.globalCompositeOperation = "source-in";
   ctx.fillStyle = "#fff";
   ctx.fillRect(0, 0, out.width, out.height);
-  ctx.restore();
+
+  // 3. Fill opaque black behind everything → white shape(s) on black.
+  ctx.globalCompositeOperation = "destination-over";
+  ctx.fillStyle = "#000";
+  ctx.fillRect(0, 0, out.width, out.height);
+
   return out.toDataURL("image/png");
 }
 

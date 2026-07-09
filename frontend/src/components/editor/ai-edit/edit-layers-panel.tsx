@@ -57,6 +57,11 @@ export function EditLayersPanel({
               title={layer.prompt || layer.label}
             >
               {layer.label || layer.engine}
+              {layer.status === "running" || layer.status === "queued" ? (
+                <span className="ml-1 tabular-nums text-muted-foreground">
+                  {Math.round(layer.progress * 100)}%
+                </span>
+              ) : null}
               {layer.status === "failed" && layer.error ? (
                 <span className="ml-1 text-destructive">— {layer.error}</span>
               ) : null}

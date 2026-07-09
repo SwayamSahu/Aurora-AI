@@ -247,10 +247,16 @@ class MockVideoEditor(VideoEditor):
             #   [effect] and [original] blended by the mask's luminance as alpha.
             mask = d / "mask.png"
             mask.write_bytes(params.mask)
+            # maskedmerge needs base, effect and mask at identical dimensions.
+            # The mask is authored at a fixed canvas size, so split the base,
+            # apply the effect to one copy, and scale the mask to the base's
+            # size (scale2ref) before merging.
             filtergraph = (
-                f"[0:v]{vf}[fx];"
-                "[2:v]format=gray,scale=iw:ih[m];"
-                "[0:v][fx][m]maskedmerge[v]"
+                "[0:v]split=2[b1][b2];"
+                f"[b1]{vf}[fx];"
+                "[2:v]format=gray[mg];"
+                "[mg][b2]scale2ref=flags=bilinear[m][base];"
+                "[base][fx][m]maskedmerge[v]"
             )
             _run(
                 [

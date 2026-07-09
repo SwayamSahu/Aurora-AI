@@ -18,7 +18,6 @@ export function CompareSlider({
   return (
     <div className="relative aspect-video w-full select-none overflow-hidden rounded-xl border bg-black">
       {/* After (full, underneath) */}
-      {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
       <video
         src={afterUrl}
         muted
