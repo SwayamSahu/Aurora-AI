@@ -149,7 +149,12 @@ export function EditorToolbar({ onExport, onAddText }: EditorToolbarProps) {
         {onExport ? (
           <>
             <Separator orientation="vertical" className="mx-0.5 h-6" />
-            <Button size="sm" onClick={onExport} className="gap-1.5">
+            <Button
+              size="sm"
+              onClick={onExport}
+              className="gap-1.5"
+              data-tour="export"
+            >
               <Download className="size-3.5" /> Export
             </Button>
           </>

@@ -135,7 +135,7 @@ docker compose -f infra/compose.dev.yml up -d db redis minio minio-init
 ```
 
 This leaves ports open for your local apps:
-Postgres on **localhost:5434**, Redis on **6379**, MinIO on **9000/9001**.
+Postgres on **localhost:5435**, Redis on **6379**, MinIO on **9000/9001**.
 
 ### Step 2 — Backend (FastAPI + Celery)
 
@@ -158,7 +158,7 @@ Now **edit `backend/.env`** so it points at the Docker services on `localhost`
 (the defaults use Docker-internal hostnames like `db`/`redis`/`minio`):
 
 ```dotenv
-DATABASE_URL=postgresql+psycopg2://aurora:aurora@localhost:5434/aurora
+DATABASE_URL=postgresql+psycopg2://aurora:aurora@localhost:5435/aurora
 REDIS_URL=redis://localhost:6379/0
 CELERY_BROKER_URL=redis://localhost:6379/1
 CELERY_RESULT_BACKEND=redis://localhost:6379/2
@@ -270,13 +270,13 @@ pytest                                # run the test suite
 | Frontend | http://localhost:3000 | — |
 | API | http://localhost:8000 (docs at `/docs`) | — |
 | API base path | all endpoints are under `/api/v1` | — |
-| PostgreSQL | `localhost:5434` (→ container 5432) | user `aurora` / pass `aurora` / db `aurora` |
+| PostgreSQL | `localhost:5435` (→ container 5432) | user `aurora` / pass `aurora` / db `aurora` |
 | Redis | `localhost:6379` | — |
 | MinIO API | `localhost:9000` | `aurora` / `aurora-secret` |
 | MinIO Console | http://localhost:9001 | `aurora` / `aurora-secret` |
 | Media bucket | `aurora-media` | auto-created on first boot |
 
-> **Heads-up:** Postgres is published on **5434** (not the usual 5432) to avoid
+> **Heads-up:** Postgres is published on **5435** (not the usual 5432) to avoid
 > clashing with other local Postgres instances. Inside the Docker network the
 > services still talk to each other on standard ports.
 
@@ -285,7 +285,7 @@ pytest                                # run the test suite
 ## 9. Troubleshooting
 
 ### "Port is already allocated" / address in use
-Another program is using one of the ports above (commonly 3000, 5432/5434, 6379,
+Another program is using one of the ports above (commonly 3000, 5432/5435, 6379,
 8000, 9000). Stop that program, or edit the `ports:` mapping in
 `infra/compose.dev.yml` (change the **left** number, e.g. `"3001:3000"`).
 
@@ -321,7 +321,7 @@ It's harmless and won't appear in an Incognito window.
 ### "connection refused" to the database / Redis
 The services may still be starting. Wait for the healthchecks (`docker compose …
 ps` shows `healthy`). For Path B, confirm you started `db redis minio` and that
-your `.env` uses `localhost:5434` for Postgres.
+your `.env` uses `localhost:5435` for Postgres.
 
 ### Registration fails with an email validation error
 Use a normal-looking domain (`you@example.com`). Reserved TLDs like `.test`,

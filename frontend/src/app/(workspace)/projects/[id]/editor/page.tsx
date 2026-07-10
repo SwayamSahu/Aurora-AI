@@ -29,6 +29,11 @@ import {
   type EditorMode,
 } from "@/components/editor/ai-edit/edit-mode-switcher";
 import { AiEditWorkspace } from "@/components/editor/ai-edit/ai-edit-workspace";
+import {
+  EditorTour,
+  EDITOR_TOUR_SEEN_KEY,
+} from "@/components/editor/editor-tour";
+import { HelpCircle } from "lucide-react";
 
 function isTypingTarget(el: EventTarget | null): boolean {
   const node = el as HTMLElement | null;
@@ -47,6 +52,12 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
   const assets = useAssets(projectId);
   const [exporting, setExporting] = React.useState(false);
   const [mode, setMode] = React.useState<EditorMode>("timeline");
+  // First-visit guide auto-opens; lazy-init avoids a set-state-in-effect.
+  const [tourOpen, setTourOpen] = React.useState(
+    () =>
+      typeof window !== "undefined" &&
+      !window.localStorage.getItem(EDITOR_TOUR_SEEN_KEY),
+  );
 
   const load = useEditorStore((s) => s.load);
   const loaded = useEditorStore((s) => s.loaded);
@@ -125,13 +136,30 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
             <ArrowLeft className="size-4" /> {project.data?.name ?? "Project"}
           </Link>
         </Button>
-        <EditModeSwitcher mode={mode} onMode={setMode} />
+        <div className="flex items-center gap-2">
+          <div data-tour="mode-switch">
+            <EditModeSwitcher mode={mode} onMode={setMode} />
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            onClick={() => {
+              setMode("timeline");
+              setTourOpen(true);
+            }}
+          >
+            <HelpCircle className="size-4" /> Guide
+          </Button>
+        </div>
       </div>
 
-      <EditorToolbar
-        onExport={() => setExporting(true)}
-        onAddText={() => setMode("timeline")}
-      />
+      <div data-tour="toolbar">
+        <EditorToolbar
+          onExport={() => setExporting(true)}
+          onAddText={() => setMode("timeline")}
+        />
+      </div>
 
       {!ready ? (
         <div className="mt-4 space-y-4">
@@ -141,7 +169,7 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
       ) : (
         <>
           <div className="mt-4 grid gap-4 lg:grid-cols-[15rem_minmax(0,1fr)_17rem]">
-            <Card className="hidden lg:block">
+            <Card className="hidden lg:block" data-tour="media">
               <CardContent className="space-y-3 p-3">
                 <AiPanel projectId={projectId} />
                 <Separator />
@@ -160,9 +188,11 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
               <AiEditWorkspace projectId={projectId} />
             ) : (
               <>
-                <PreviewCanvas />
+                <div data-tour="preview" className="min-w-0">
+                  <PreviewCanvas />
+                </div>
 
-                <Card>
+                <Card data-tour="inspector">
                   <CardContent className="p-4">
                     <Inspector />
                   </CardContent>
@@ -171,9 +201,14 @@ function EditorWorkspace({ projectId }: { projectId: string }) {
             )}
           </div>
 
-          <div className="mt-4">
+          <div className="mt-4" data-tour="timeline">
             <Timeline />
           </div>
+
+          <EditorTour
+            open={tourOpen}
+            onClose={() => setTourOpen(false)}
+          />
         </>
       )}
       <ExportDialog
