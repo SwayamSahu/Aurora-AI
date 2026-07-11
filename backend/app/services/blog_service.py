@@ -12,12 +12,30 @@ import uuid
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.db.models import BlogComment, BlogLike, BlogMedia, BlogPost
 from app.db.models.blog import BlogStatus
 from app.services.html_sanitize import html_to_text, sanitize_html
 
 _WORDS_PER_MINUTE = 220
 _SLUG_RE = re.compile(r"[^a-z0-9]+")
+
+
+def media_url(media_id: str) -> str:
+    return f"{settings.api_v1_prefix}/blog/media/{media_id}"
+
+
+def cover_url(post: BlogPost) -> str | None:
+    return media_url(post.cover_media_id) if post.cover_media_id else None
+
+
+def to_read(schema_cls, post: BlogPost):
+    """Validates `post` into `schema_cls` and fills in `cover_url`, which
+    the ORM doesn't carry directly (used for both summary and detail
+    responses, in `blog.py` and `admin_blog.py`)."""
+    data = schema_cls.model_validate(post)
+    data.cover_url = cover_url(post)
+    return data
 
 
 def slugify(title: str) -> str:
@@ -151,6 +169,34 @@ def list_for_author(db: Session, author_id: str) -> list[BlogPost]:
     )
 
 
+def list_for_admin(
+    db: Session,
+    *,
+    status: BlogStatus | None = None,
+    author_id: str | None = None,
+    query: str | None = None,
+    limit: int = 24,
+    offset: int = 0,
+) -> tuple[list[BlogPost], int]:
+    """All posts regardless of author/status — for the moderation dashboard."""
+    stmt = select(BlogPost)
+    if status is not None:
+        stmt = stmt.where(BlogPost.status == status)
+    if author_id:
+        stmt = stmt.where(BlogPost.author_id == author_id)
+    if query:
+        like = f"%{query}%"
+        stmt = stmt.where(BlogPost.title.ilike(like) | BlogPost.excerpt.ilike(like))
+
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    posts = list(
+        db.scalars(
+            stmt.order_by(BlogPost.updated_at.desc()).limit(limit).offset(offset)
+        )
+    )
+    return posts, total
+
+
 def featured(db: Session, limit: int = 4) -> list[BlogPost]:
     return list(
         db.scalars(
@@ -218,14 +264,13 @@ def add_comment(db: Session, post: BlogPost, author_id: str, body: str) -> BlogC
     return comment
 
 
-def list_comments(db: Session, post_id: str) -> list[BlogComment]:
-    return list(
-        db.scalars(
-            select(BlogComment)
-            .where(BlogComment.post_id == post_id)
-            .order_by(BlogComment.created_at.asc())
-        )
-    )
+def list_comments(
+    db: Session, post_id: str, *, include_hidden: bool = False
+) -> list[BlogComment]:
+    stmt = select(BlogComment).where(BlogComment.post_id == post_id)
+    if not include_hidden:
+        stmt = stmt.where(BlogComment.is_hidden.is_(False))
+    return list(db.scalars(stmt.order_by(BlogComment.created_at.asc())))
 
 
 def get_comment(db: Session, comment_id: str) -> BlogComment | None:
@@ -234,10 +279,35 @@ def get_comment(db: Session, comment_id: str) -> BlogComment | None:
 
 def delete_comment(db: Session, comment: BlogComment) -> None:
     post = db.get(BlogPost, comment.post_id)
+    was_visible = not comment.is_hidden
     db.delete(comment)
-    if post is not None:
+    if post is not None and was_visible:
         post.comment_count = max(0, post.comment_count - 1)
     db.commit()
+
+
+def set_comment_hidden(db: Session, comment: BlogComment, hidden: bool) -> BlogComment:
+    """Admin soft-hide/unhide — the row stays, but it's excluded from public
+    reads and from the post's visible `comment_count`."""
+    if comment.is_hidden == hidden:
+        return comment
+    post = db.get(BlogPost, comment.post_id)
+    comment.is_hidden = hidden
+    if post is not None:
+        delta = -1 if hidden else 1
+        post.comment_count = max(0, post.comment_count + delta)
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def update_comment_body(db: Session, comment: BlogComment, body: str) -> BlogComment:
+    """Admin-only edit (e.g. redacting something) — regular users can't
+    edit their own comments in this build, only delete them."""
+    comment.body = body.strip()
+    db.commit()
+    db.refresh(comment)
+    return comment
 
 
 # ------------------------------- media ---------------------------------- #

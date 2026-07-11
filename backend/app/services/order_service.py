@@ -30,6 +30,12 @@ def list_sales_for_seller(db: Session, seller_id: str) -> list[OrderItem]:
     )
 
 
+def get_for_admin(db: Session, order_id: str) -> Order | None:
+    return db.scalar(
+        select(Order).where(Order.id == order_id).options(selectinload(Order.items))
+    )
+
+
 def buyer_has_purchased(db: Session, buyer_id: str, listing_id: str) -> bool:
     """Whether `buyer_id` has an order containing `listing_id` — used to let
     buyers keep viewing a listing's detail page after it goes non-active

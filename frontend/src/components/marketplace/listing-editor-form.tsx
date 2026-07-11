@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
+import { useAuth } from "@/components/auth/auth-provider";
 import {
   useCreateListing,
   useDeleteListing,
@@ -44,7 +45,14 @@ const CATEGORY_SUGGESTIONS = [
 
 export function ListingEditorForm({ existing }: { existing?: ListingDetail }) {
   const router = useRouter();
+  const { user } = useAuth();
   const isEdit = !!existing;
+  // An admin editing someone else's listing — the quota/dashboard concepts
+  // below are all about the editor's OWN account and don't apply here,
+  // since the backend never quota-checks admins regardless of whose
+  // listing they're touching.
+  const isAdminEditingOthers =
+    !!user?.is_superuser && isEdit && existing.seller.id !== user.id;
 
   const [title, setTitle] = React.useState(existing?.title ?? "");
   const [description, setDescription] = React.useState(existing?.description ?? "");
@@ -126,7 +134,7 @@ export function ListingEditorForm({ existing }: { existing?: ListingDetail }) {
         });
         toast.success(status === "active" ? "Listing published." : "Draft saved.");
       }
-      router.push("/explore/me");
+      router.push(isAdminEditingOthers ? "/admin/marketplace" : "/explore/me");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't save the listing.");
     } finally {
@@ -139,7 +147,7 @@ export function ListingEditorForm({ existing }: { existing?: ListingDetail }) {
     try {
       await remove.mutateAsync(existing.id);
       toast.success("Listing deleted.");
-      router.push("/explore/me");
+      router.push(isAdminEditingOthers ? "/admin/marketplace" : "/explore/me");
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Couldn't delete the listing.");
     }
@@ -148,13 +156,17 @@ export function ListingEditorForm({ existing }: { existing?: ListingDetail }) {
   // Publishing only costs a quota slot if this listing isn't already
   // active — matches the backend's `_ensure_quota`, which only checks on
   // a transition *into* active, not on re-saving an already-active listing.
+  // Admins never quota-check server-side, so skip the client display too.
   const wouldConsumeQuotaSlot = !existing || existing.status !== "active";
   const quotaExceeded =
-    wouldConsumeQuotaSlot && !!wallet && activeCount >= wallet.listing_quota;
+    !user?.is_superuser &&
+    wouldConsumeQuotaSlot &&
+    !!wallet &&
+    activeCount >= wallet.listing_quota;
 
   return (
     <div className="mx-auto w-full max-w-[720px] px-4 py-10 md:px-8">
-      {wallet ? (
+      {wallet && !isAdminEditingOthers ? (
         <p className="mb-6 text-sm text-muted-foreground">
           Active listings: <strong>{activeCount}</strong> / {wallet.listing_quota}
           {quotaExceeded ? (

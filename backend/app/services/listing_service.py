@@ -8,6 +8,8 @@ module's `update()`.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime, timedelta
+
 from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
@@ -22,7 +24,7 @@ from app.db.models import (
     User,
 )
 from app.services import wallet_service
-from app.services.marketplace_errors import QuotaExceededError
+from app.services.marketplace_errors import QuotaExceededError, RateLimitedError
 
 _EAGER = (selectinload(Listing.source_asset), selectinload(Listing.cover_media))
 
@@ -87,7 +89,26 @@ def _ensure_quota(db: Session, seller: User) -> None:
         )
 
 
+def _ensure_not_rate_limited(db: Session, seller: User) -> None:
+    if seller.is_superuser:
+        return
+    cutoff = datetime.now(UTC) - timedelta(hours=1)
+    recent = (
+        db.scalar(
+            select(func.count()).where(
+                Listing.seller_id == seller.id, Listing.created_at >= cutoff
+            )
+        )
+        or 0
+    )
+    if recent >= settings.marketplace_listing_rate_limit_per_hour:
+        raise RateLimitedError(
+            "You're creating listings too fast — try again in a bit."
+        )
+
+
 def create(db: Session, seller: User, data) -> Listing:
+    _ensure_not_rate_limited(db, seller)
     status = ListingStatus(data.status) if data.status else ListingStatus.DRAFT
     if status == ListingStatus.ACTIVE:
         _ensure_quota(db, seller)
@@ -192,6 +213,31 @@ def list_for_seller(db: Session, seller_id: str) -> list[Listing]:
     )
 
 
+def list_for_moderation(
+    db: Session,
+    *,
+    status: ListingStatus | None = None,
+    seller_id: str | None = None,
+    query: str | None = None,
+) -> list[Listing]:
+    stmt = select(Listing).options(*_EAGER).order_by(Listing.created_at.desc())
+    if status is not None:
+        stmt = stmt.where(Listing.status == status)
+    if seller_id:
+        stmt = stmt.where(Listing.seller_id == seller_id)
+    if query:
+        like = f"%{query}%"
+        stmt = stmt.where(Listing.title.ilike(like) | Listing.description.ilike(like))
+    return list(db.scalars(stmt))
+
+
+def admin_delist(db: Session, listing: Listing) -> Listing:
+    listing.status = ListingStatus.DELISTED
+    db.commit()
+    db.refresh(listing)
+    return listing
+
+
 def category_counts(db: Session) -> dict[str, int]:
     rows = db.execute(
         select(Listing.category, func.count(Listing.id))
@@ -273,14 +319,13 @@ def add_comment(
     return comment
 
 
-def list_comments(db: Session, listing_id: str) -> list[ListingComment]:
-    return list(
-        db.scalars(
-            select(ListingComment)
-            .where(ListingComment.listing_id == listing_id)
-            .order_by(ListingComment.created_at.asc())
-        )
-    )
+def list_comments(
+    db: Session, listing_id: str, *, include_hidden: bool = False
+) -> list[ListingComment]:
+    stmt = select(ListingComment).where(ListingComment.listing_id == listing_id)
+    if not include_hidden:
+        stmt = stmt.where(ListingComment.is_hidden.is_(False))
+    return list(db.scalars(stmt.order_by(ListingComment.created_at.asc())))
 
 
 def get_comment(db: Session, comment_id: str) -> ListingComment | None:
@@ -289,10 +334,39 @@ def get_comment(db: Session, comment_id: str) -> ListingComment | None:
 
 def delete_comment(db: Session, comment: ListingComment) -> None:
     listing = db.get(Listing, comment.listing_id)
+    was_visible = not comment.is_hidden
     db.delete(comment)
-    if listing is not None:
+    if listing is not None and was_visible:
         listing.comment_count = max(0, listing.comment_count - 1)
     db.commit()
+
+
+def set_comment_hidden(
+    db: Session, comment: ListingComment, hidden: bool
+) -> ListingComment:
+    """Admin soft-hide/unhide — the row stays, but it's excluded from public
+    reads and from the listing's visible `comment_count`."""
+    if comment.is_hidden == hidden:
+        return comment
+    listing = db.get(Listing, comment.listing_id)
+    comment.is_hidden = hidden
+    if listing is not None:
+        delta = -1 if hidden else 1
+        listing.comment_count = max(0, listing.comment_count + delta)
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def update_comment_body(
+    db: Session, comment: ListingComment, body: str
+) -> ListingComment:
+    """Admin-only edit — regular users can't edit their own comments in
+    this build, only delete them."""
+    comment.body = body.strip()
+    db.commit()
+    db.refresh(comment)
+    return comment
 
 
 # --------------------------- generation reveal --------------------------- #

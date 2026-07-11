@@ -41,7 +41,7 @@ export default function EditBlogPostPage() {
     );
   }
 
-  if (post.author.id !== user?.id) {
+  if (post.author.id !== user?.id && !user?.is_superuser) {
     return (
       <p className="py-24 text-center text-muted-foreground">
         You can only edit your own posts.

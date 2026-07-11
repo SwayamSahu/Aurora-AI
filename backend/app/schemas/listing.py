@@ -111,6 +111,12 @@ class ListingCommentRead(BaseModel):
     body: str
     author: ListingAuthor
     created_at: datetime
+    is_hidden: bool = False
+
+
+class ListingCommentAdminUpdate(BaseModel):
+    body: str | None = Field(default=None, min_length=1, max_length=2000)
+    is_hidden: bool | None = None
 
 
 class ListingLikeToggle(BaseModel):

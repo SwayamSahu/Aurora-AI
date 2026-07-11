@@ -129,6 +129,15 @@ class Settings(BaseSettings):
     # seller's wallet. No platform wallet exists in v1 — the fee amount is
     # simply not credited anywhere (retained implicitly).
     marketplace_platform_fee: float = 0.10
+    # Anti-abuse: max listings a single seller may create within one hour
+    # (regardless of status — drafts count too, so this caps spam creation).
+    marketplace_listing_rate_limit_per_hour: int = 20
+
+    # Real payment processing — unset (None) by default, which keeps
+    # MockPaymentProvider active (see app/services/payment_provider.py).
+    # Setting this activates StripePaymentProvider, which is scaffolded but
+    # has NOT been verified against a real Stripe account in this build.
+    stripe_secret_key: str | None = None
 
     @field_validator("debug", mode="before")
     @classmethod

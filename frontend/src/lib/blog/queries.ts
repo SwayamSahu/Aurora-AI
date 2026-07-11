@@ -10,12 +10,15 @@ import {
   createPost,
   deleteComment,
   deletePost,
+  getAdminPostComments,
   getCategoryCounts,
   getComments,
   getFeatured,
   getMyPosts,
   getPost,
+  listAllPostsAdmin,
   listPosts,
+  moderateComment,
   toggleLike,
   updatePost,
   type BlogPostInput,
@@ -125,6 +128,56 @@ export function useDeleteComment(slug: string) {
     mutationFn: (commentId: string) => deleteComment(commentId),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["blog-comments", slug] });
+    },
+  });
+}
+
+// --------------------------------------------------------------------------- #
+// Admin console
+// --------------------------------------------------------------------------- #
+export function useAdminPosts(params: {
+  status?: string;
+  author_id?: string;
+  q?: string;
+}) {
+  return useQuery({
+    queryKey: ["blog-admin-posts", params],
+    queryFn: () => listAllPostsAdmin(params),
+  });
+}
+
+export function useAdminPostComments(postId: string) {
+  return useQuery({
+    queryKey: ["blog-admin-comments", postId],
+    queryFn: () => getAdminPostComments(postId),
+    enabled: !!postId,
+  });
+}
+
+export function useModerateComment(postId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      commentId,
+      input,
+    }: {
+      commentId: string;
+      input: { body?: string; is_hidden?: boolean };
+    }) => moderateComment(commentId, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blog-admin-comments", postId] });
+      qc.invalidateQueries({ queryKey: ["blog-admin-posts"] });
+    },
+  });
+}
+
+export function useAdminDeleteComment(postId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => deleteComment(commentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blog-admin-comments", postId] });
+      qc.invalidateQueries({ queryKey: ["blog-admin-posts"] });
     },
   });
 }

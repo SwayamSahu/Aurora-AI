@@ -101,6 +101,22 @@ def debit(
     return tx
 
 
+def admin_adjust(
+    db: Session, wallet: Wallet, amount: int, note: str
+) -> CreditTransaction:
+    """Admin-only manual credit/debit for support cases the standard flows
+    don't cover. `amount` may be positive (credit) or negative (debit).
+    Commits immediately — this is a standalone action, not a step inside a
+    larger transaction. Caller must pass a `get_wallet_locked` wallet."""
+    if amount > 0:
+        tx = credit(db, wallet, amount, TransactionType.ADMIN_ADJUST, note=note)
+    else:
+        tx = debit(db, wallet, -amount, TransactionType.ADMIN_ADJUST, note=note)
+    db.commit()
+    db.refresh(wallet)
+    return tx
+
+
 def list_transactions(
     db: Session, wallet_id: str, *, limit: int = 24, offset: int = 0
 ) -> tuple[list[CreditTransaction], int]:

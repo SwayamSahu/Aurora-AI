@@ -3,10 +3,15 @@ import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tansta
 import {
   addListingComment,
   addToCart,
+  adminAdjustWallet,
+  adminDelistListing,
+  adminRefundOrder,
   checkout,
+  createAdminPlan,
   createListing,
   deleteListing,
   deleteListingComment,
+  getAdminListingComments,
   getCart,
   getCategoryCounts,
   getListing,
@@ -18,15 +23,20 @@ import {
   getMySellableAssets,
   getWallet,
   getWalletTransactions,
+  listAdminListings,
+  listAdminPlans,
   listListings,
   listPlans,
+  moderateListingComment,
   purchasePlan,
   removeFromCart,
   toggleListingLike,
+  updateAdminPlan,
   updateListing,
   type ListingInput,
   type ListingUpdateInput,
 } from "@/lib/marketplace/api";
+import type { AdminPlanInput } from "@/lib/marketplace/types";
 
 const PAGE_SIZE = 24;
 
@@ -142,6 +152,9 @@ export function useDeleteListingComment(id: string) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mk-listing-comments", id] });
       qc.invalidateQueries({ queryKey: ["mk-listing", id] });
+      // No-op if never fetched — but the admin moderation panel reuses
+      // this same mutation, so keep its cache in sync too.
+      qc.invalidateQueries({ queryKey: ["mk-admin-comments", id] });
     },
   });
 }
@@ -218,5 +231,98 @@ export function usePurchasePlan() {
   return useMutation({
     mutationFn: (planId: string) => purchasePlan(planId),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["mk-wallet"] }),
+  });
+}
+
+// --------------------------------------------------------------------------- #
+// Admin console
+// --------------------------------------------------------------------------- #
+export function useAdminPlans() {
+  return useQuery({ queryKey: ["mk-admin-plans"], queryFn: listAdminPlans });
+}
+
+export function useCreateAdminPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AdminPlanInput) => createAdminPlan(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-admin-plans"] });
+      qc.invalidateQueries({ queryKey: ["mk-plans"] });
+    },
+  });
+}
+
+export function useUpdateAdminPlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, input }: { id: string; input: Partial<AdminPlanInput> }) =>
+      updateAdminPlan(id, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-admin-plans"] });
+      qc.invalidateQueries({ queryKey: ["mk-plans"] });
+    },
+  });
+}
+
+export function useAdminListings(status?: string) {
+  return useQuery({
+    queryKey: ["mk-admin-listings", status],
+    queryFn: () => listAdminListings(status),
+  });
+}
+
+export function useAdminDelistListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => adminDelistListing(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-admin-listings"] });
+      qc.invalidateQueries({ queryKey: ["mk-listings"] });
+    },
+  });
+}
+
+export function useAdminAdjustWallet() {
+  return useMutation({
+    mutationFn: ({
+      userId,
+      amount,
+      note,
+    }: {
+      userId: string;
+      amount: number;
+      note: string;
+    }) => adminAdjustWallet(userId, amount, note),
+  });
+}
+
+export function useAdminRefundOrder() {
+  return useMutation({
+    mutationFn: (orderId: string) => adminRefundOrder(orderId),
+  });
+}
+
+export function useAdminListingComments(listingId: string) {
+  return useQuery({
+    queryKey: ["mk-admin-comments", listingId],
+    queryFn: () => getAdminListingComments(listingId),
+    enabled: !!listingId,
+  });
+}
+
+export function useModerateListingComment(listingId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      commentId,
+      input,
+    }: {
+      commentId: string;
+      input: { body?: string; is_hidden?: boolean };
+    }) => moderateListingComment(commentId, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-admin-comments", listingId] });
+      qc.invalidateQueries({ queryKey: ["mk-admin-listings"] });
+    },
   });
 }

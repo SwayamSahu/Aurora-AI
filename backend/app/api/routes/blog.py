@@ -6,8 +6,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser
-from app.core.config import settings
-from app.db.models import BlogComment, BlogPost
+from app.db.models import BlogComment, BlogPost, User
 from app.schemas.blog import (
     BlogCommentCreate,
     BlogCommentRead,
@@ -29,17 +28,15 @@ MAX_MEDIA_BYTES = 20 * 1024 * 1024  # 20 MB
 
 
 def _media_url(media_id: str) -> str:
-    return f"{settings.api_v1_prefix}/blog/media/{media_id}"
+    return blog_service.media_url(media_id)
 
 
 def _cover_url(post: BlogPost) -> str | None:
-    return _media_url(post.cover_media_id) if post.cover_media_id else None
+    return blog_service.cover_url(post)
 
 
 def _summary(post: BlogPost) -> BlogPostSummary:
-    data = BlogPostSummary.model_validate(post)
-    data.cover_url = _cover_url(post)
-    return data
+    return blog_service.to_read(BlogPostSummary, post)
 
 
 # --------------------------------------------------------------------------- #
@@ -83,9 +80,10 @@ def get_post(slug: str, db: DbSession, current_user: OptionalUser) -> BlogPostDe
     post = blog_service.get_by_slug(db, slug)
     if post is None:
         raise HTTPException(status_code=404, detail="Post not found.")
-    # Drafts are visible only to their author.
+    # Drafts are visible only to their author or an admin.
     if post.status.value == "draft" and (
-        current_user is None or current_user.id != post.author_id
+        current_user is None
+        or (current_user.id != post.author_id and not current_user.is_superuser)
     ):
         raise HTTPException(status_code=404, detail="Post not found.")
 
@@ -111,11 +109,11 @@ def get_comments(slug: str, db: DbSession) -> list[BlogCommentRead]:
 # --------------------------------------------------------------------------- #
 # Authoring (auth-gated, author-only mutations)
 # --------------------------------------------------------------------------- #
-def _owned_post(db: DbSession, user_id: str, post_id: str) -> BlogPost:
+def _owned_post(db: DbSession, current_user: User, post_id: str) -> BlogPost:
     post = blog_service.get_by_id(db, post_id)
     if post is None:
         raise HTTPException(status_code=404, detail="Post not found.")
-    if post.author_id != user_id:
+    if post.author_id != current_user.id and not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Not your post.")
     return post
 
@@ -137,7 +135,7 @@ def update_post(
     current_user: CurrentUser,
     db: DbSession,
 ) -> BlogPostDetail:
-    post = _owned_post(db, current_user.id, post_id)
+    post = _owned_post(db, current_user, post_id)
     post = blog_service.update(db, post, data)
     out = BlogPostDetail.model_validate(post)
     out.cover_url = _cover_url(post)
@@ -147,7 +145,7 @@ def update_post(
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(post_id: str, current_user: CurrentUser, db: DbSession) -> Response:
-    post = _owned_post(db, current_user.id, post_id)
+    post = _owned_post(db, current_user, post_id)
     blog_service.delete_post(db, post)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -195,7 +193,7 @@ def delete_comment(
     comment: BlogComment | None = blog_service.get_comment(db, comment_id)
     if comment is None:
         raise HTTPException(status_code=404, detail="Comment not found.")
-    if comment.author_id != current_user.id:
+    if comment.author_id != current_user.id and not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Not your comment.")
     blog_service.delete_comment(db, comment)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

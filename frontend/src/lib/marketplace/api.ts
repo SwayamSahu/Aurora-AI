@@ -2,6 +2,8 @@ import { apiFetch } from "@/lib/api/client";
 import { API_BASE } from "@/lib/api/config";
 import { getToken } from "@/lib/api/token";
 import type {
+  AdminPlanInput,
+  AdminPlanRead,
   CartRead,
   CreditPlanRead,
   ListingCommentRead,
@@ -210,4 +212,65 @@ export function addListingComment(listingId: string, body: string) {
 
 export function deleteListingComment(commentId: string) {
   return apiFetch<void>(`/marketplace/comments/${commentId}`, { method: "DELETE" });
+}
+
+// --------------------------------------------------------------------------- #
+// Admin console
+// --------------------------------------------------------------------------- #
+export function listAdminPlans() {
+  return apiFetch<AdminPlanRead[]>("/admin/marketplace/plans");
+}
+
+export function createAdminPlan(input: AdminPlanInput) {
+  return apiFetch<AdminPlanRead>("/admin/marketplace/plans", {
+    method: "POST",
+    json: input,
+  });
+}
+
+export function updateAdminPlan(id: string, input: Partial<AdminPlanInput>) {
+  return apiFetch<AdminPlanRead>(`/admin/marketplace/plans/${id}`, {
+    method: "PATCH",
+    json: input,
+  });
+}
+
+export function listAdminListings(status?: string) {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiFetch<MarketplaceListing[]>(`/admin/marketplace/listings${qs}`);
+}
+
+export function adminDelistListing(id: string) {
+  return apiFetch<MarketplaceListing>(`/admin/marketplace/listings/${id}/delist`, {
+    method: "POST",
+  });
+}
+
+export function adminAdjustWallet(userId: string, amount: number, note: string) {
+  return apiFetch<{ balance_credits: number }>(
+    `/admin/marketplace/wallets/${userId}/adjust`,
+    { method: "POST", json: { amount, note } },
+  );
+}
+
+export function adminRefundOrder(orderId: string) {
+  return apiFetch<OrderRead>(`/admin/marketplace/orders/${orderId}/refund`, {
+    method: "POST",
+  });
+}
+
+export function getAdminListingComments(listingId: string) {
+  return apiFetch<ListingCommentRead[]>(
+    `/admin/marketplace/listings/${listingId}/comments`,
+  );
+}
+
+export function moderateListingComment(
+  commentId: string,
+  input: { body?: string; is_hidden?: boolean },
+) {
+  return apiFetch<ListingCommentRead>(`/admin/marketplace/comments/${commentId}`, {
+    method: "PATCH",
+    json: input,
+  });
 }

@@ -48,6 +48,12 @@ class BlogCommentRead(BaseModel):
     body: str
     author: BlogAuthor
     created_at: datetime
+    is_hidden: bool = False
+
+
+class BlogCommentAdminUpdate(BaseModel):
+    body: str | None = Field(default=None, min_length=1, max_length=2000)
+    is_hidden: bool | None = None
 
 
 class BlogLikeToggle(BaseModel):

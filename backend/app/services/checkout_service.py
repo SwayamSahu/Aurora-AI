@@ -14,9 +14,16 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.db.models import Listing, ListingStatus, Order, OrderItem, TransactionType
+from app.db.models import (
+    Listing,
+    ListingStatus,
+    Order,
+    OrderItem,
+    OrderStatus,
+    TransactionType,
+)
 from app.services import asset_service, cart_service, wallet_service
-from app.services.marketplace_errors import ListingUnavailableError
+from app.services.marketplace_errors import ListingUnavailableError, MarketplaceError
 
 
 def checkout(db: Session, buyer_id: str) -> Order:
@@ -95,6 +102,52 @@ def checkout(db: Session, buyer_id: str) -> Order:
 
     cart_service.clear_cart(db, buyer_id)
 
+    db.commit()
+    db.refresh(order)
+    return order
+
+
+def refund_order(db: Session, order: Order) -> Order:
+    """Admin-triggered refund: credits the buyer back in full and reclaims
+    each seller's earning where they still have the balance to cover it (a
+    seller who already spent it isn't driven negative — the platform
+    absorbs that gap, a deliberate v1 simplification).
+
+    Does NOT reverse listing/stock state or delete the buyer's cloned asset
+    — this is a financial reversal only. Re-listing, if desired, is a
+    separate manual step for the admin/seller.
+    """
+    if order.status == OrderStatus.REFUNDED:
+        raise MarketplaceError("Order already refunded.")
+
+    buyer_wallet = wallet_service.get_wallet_locked(db, order.buyer_id)
+    wallet_service.credit(
+        db,
+        buyer_wallet,
+        order.total_credits,
+        TransactionType.REFUND,
+        note="Order refund",
+        related_order_id=order.id,
+    )
+
+    for item in order.items:
+        fee = round(item.price_credits * settings.marketplace_platform_fee)
+        seller_earning = item.price_credits - fee
+        if seller_earning <= 0:
+            continue
+        seller_wallet = wallet_service.get_wallet_locked(db, item.seller_id)
+        reclaim = min(seller_earning, seller_wallet.balance_credits)
+        if reclaim > 0:
+            wallet_service.debit(
+                db,
+                seller_wallet,
+                reclaim,
+                TransactionType.REFUND,
+                note=f"Refund reclaim: {item.title}",
+                related_order_id=order.id,
+            )
+
+    order.status = OrderStatus.REFUNDED
     db.commit()
     db.refresh(order)
     return order

@@ -39,7 +39,7 @@ export default function EditListingPage() {
     );
   }
 
-  if (listing.seller.id !== user?.id) {
+  if (listing.seller.id !== user?.id && !user?.is_superuser) {
     return (
       <p className="py-24 text-center text-muted-foreground">
         You can only edit your own listings.

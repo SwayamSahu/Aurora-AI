@@ -23,3 +23,7 @@ class ListingUnavailableError(MarketplaceError):
 
 class PaymentFailedError(MarketplaceError):
     pass
+
+
+class RateLimitedError(MarketplaceError):
+    pass

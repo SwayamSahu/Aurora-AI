@@ -5,6 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.routes import (
+    admin,
+    admin_blog,
     assets,
     audio,
     auth,
@@ -36,6 +38,8 @@ api_router.include_router(blog.router)
 api_router.include_router(marketplace.router)
 api_router.include_router(listings.router)
 api_router.include_router(commerce.router)
+api_router.include_router(admin.router)
+api_router.include_router(admin_blog.router)
 api_router.include_router(timeline.router)
 api_router.include_router(audio.router)
 api_router.include_router(export.router)

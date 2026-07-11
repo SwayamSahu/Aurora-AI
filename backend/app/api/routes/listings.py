@@ -10,7 +10,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser
-from app.db.models import Listing, ListingComment
+from app.db.models import Listing, ListingComment, User
 from app.schemas.listing import (
     ListingCommentCreate,
     ListingCommentRead,
@@ -24,7 +24,7 @@ from app.schemas.listing import (
     SellableAssetRead,
 )
 from app.services import asset_service, listing_service, order_service
-from app.services.marketplace_errors import MarketplaceError
+from app.services.marketplace_errors import MarketplaceError, RateLimitedError
 from app.storage import get_storage
 
 router = APIRouter(prefix="/marketplace", tags=["marketplace"])
@@ -110,9 +110,11 @@ def get_listing(
     is_buyer = current_user is not None and order_service.buyer_has_purchased(
         db, current_user.id, listing_id
     )
-    # Non-active listings are visible only to their seller, or to a buyer
-    # who purchased them (so "sold" doesn't 404 the item you just bought).
-    if listing.status.value != "active" and not (is_seller or is_buyer):
+    is_admin = current_user is not None and current_user.is_superuser
+    # Non-active listings are visible only to their seller, a buyer who
+    # purchased them (so "sold" doesn't 404 the item you just bought), or
+    # an admin moderating it.
+    if listing.status.value != "active" and not (is_seller or is_buyer or is_admin):
         raise HTTPException(status_code=404, detail="Listing not found.")
 
     out = _detail(listing)
@@ -130,9 +132,14 @@ def get_listing(
 # --------------------------------------------------------------------------- #
 # Seller CRUD
 # --------------------------------------------------------------------------- #
-def _owned_listing(db: DbSession, user_id: str, listing_id: str) -> Listing:
-    listing = listing_service.get_for_owner(db, user_id, listing_id)
+def _owned_listing(db: DbSession, current_user: User, listing_id: str) -> Listing:
+    listing = listing_service.get_by_id(db, listing_id)
     if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found.")
+    # 404 (not 403) for a non-owner, non-admin — matches the original M2
+    # contract of not revealing that a listing exists to someone who can't
+    # see it, rather than confirming its existence via a 403.
+    if listing.seller_id != current_user.id and not current_user.is_superuser:
         raise HTTPException(status_code=404, detail="Listing not found.")
     return listing
 
@@ -148,6 +155,8 @@ def create_listing(
         raise HTTPException(status_code=404, detail="Asset not found.")
     try:
         listing = listing_service.create(db, current_user, data)
+    except RateLimitedError as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
     except MarketplaceError as exc:
         raise HTTPException(status_code=402, detail=str(exc)) from exc
     return _detail(listing)
@@ -157,7 +166,7 @@ def create_listing(
 def update_listing(
     listing_id: str, data: ListingUpdate, current_user: CurrentUser, db: DbSession
 ) -> ListingDetail:
-    listing = _owned_listing(db, current_user.id, listing_id)
+    listing = _owned_listing(db, current_user, listing_id)
     try:
         listing = listing_service.update(db, current_user, listing, data)
     except MarketplaceError as exc:
@@ -171,7 +180,7 @@ def update_listing(
 def delete_listing(
     listing_id: str, current_user: CurrentUser, db: DbSession
 ) -> Response:
-    listing = _owned_listing(db, current_user.id, listing_id)
+    listing = _owned_listing(db, current_user, listing_id)
     if listing.status.value == "sold":
         raise HTTPException(
             status_code=409, detail="Sold listings can't be deleted — delist instead."
@@ -277,7 +286,7 @@ def delete_comment(
     comment: ListingComment | None = listing_service.get_comment(db, comment_id)
     if comment is None:
         raise HTTPException(status_code=404, detail="Comment not found.")
-    if comment.author_id != current_user.id:
+    if comment.author_id != current_user.id and not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Not your comment.")
     listing_service.delete_comment(db, comment)
     return Response(status_code=status.HTTP_204_NO_CONTENT)

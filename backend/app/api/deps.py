@@ -70,9 +70,14 @@ OptionalUser = Annotated[User | None, Depends(get_optional_user)]
 def get_current_user_flexible(
     db: DbSession,
     token: Annotated[str | None, Query()] = None,
-    header_token: Annotated[str | None, Depends(OAuth2PasswordBearer(
-        tokenUrl=f"{settings.api_v1_prefix}/auth/login", auto_error=False
-    ))] = None,
+    header_token: Annotated[
+        str | None,
+        Depends(
+            OAuth2PasswordBearer(
+                tokenUrl=f"{settings.api_v1_prefix}/auth/login", auto_error=False
+            )
+        ),
+    ] = None,
 ) -> User:
     """Auth for media endpoints: accepts a bearer header OR a `?token=` query.
 
@@ -94,3 +99,12 @@ def get_current_user_flexible(
 
 
 FlexibleUser = Annotated[User, Depends(get_current_user_flexible)]
+
+
+def get_admin_user(current_user: CurrentUser) -> User:
+    if not current_user.is_superuser:
+        raise HTTPException(status_code=403, detail="Admin access required.")
+    return current_user
+
+
+AdminUser = Annotated[User, Depends(get_admin_user)]

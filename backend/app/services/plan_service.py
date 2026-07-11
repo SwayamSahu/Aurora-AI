@@ -29,6 +29,45 @@ def get_plan(db: Session, plan_id: str) -> CreditPlan | None:
     return db.get(CreditPlan, plan_id)
 
 
+# --------------------------------- admin ---------------------------------- #
+def list_all_plans(db: Session) -> list[CreditPlan]:
+    """Includes inactive plans — active-only `list_plans` is for the public
+    pricing page; this is for the admin catalog view."""
+    return list(db.scalars(select(CreditPlan).order_by(CreditPlan.sort_order.asc())))
+
+
+def create_plan(db: Session, data) -> CreditPlan:
+    plan = CreditPlan(
+        name=data.name,
+        price_cents=data.price_cents,
+        credits_granted=data.credits_granted,
+        listing_quota=data.listing_quota,
+        is_active=data.is_active if data.is_active is not None else True,
+        sort_order=data.sort_order or 0,
+    )
+    db.add(plan)
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
+def update_plan(db: Session, plan: CreditPlan, data) -> CreditPlan:
+    for field in (
+        "name",
+        "price_cents",
+        "credits_granted",
+        "listing_quota",
+        "is_active",
+        "sort_order",
+    ):
+        value = getattr(data, field, None)
+        if value is not None:
+            setattr(plan, field, value)
+    db.commit()
+    db.refresh(plan)
+    return plan
+
+
 def purchase_plan(
     db: Session, user_id: str, plan: CreditPlan, provider: PaymentProvider
 ) -> PlanPurchase:

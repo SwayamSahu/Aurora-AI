@@ -45,6 +45,7 @@ export interface BlogComment {
   body: string;
   author: BlogAuthor;
   created_at: string;
+  is_hidden: boolean;
 }
 
 export interface BlogPostInput {
@@ -164,4 +165,37 @@ export async function uploadBlogMedia(file: File): Promise<BlogMedia> {
  * fetchable URL for <img src>. */
 export function absoluteMediaUrl(pathOrUrl: string): string {
   return pathOrUrl.startsWith("http") ? pathOrUrl : `${API_BASE}${pathOrUrl}`;
+}
+
+// --------------------------------------------------------------------------- #
+// Admin console
+// --------------------------------------------------------------------------- #
+export function listAllPostsAdmin(params: {
+  status?: string;
+  author_id?: string;
+  q?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  if (params.author_id) qs.set("author_id", params.author_id);
+  if (params.q) qs.set("q", params.q);
+  qs.set("limit", String(params.limit ?? 24));
+  qs.set("offset", String(params.offset ?? 0));
+  return apiFetch<BlogListResponse>(`/admin/blog/posts?${qs.toString()}`);
+}
+
+export function getAdminPostComments(postId: string) {
+  return apiFetch<BlogComment[]>(`/admin/blog/posts/${postId}/comments`);
+}
+
+export function moderateComment(
+  commentId: string,
+  input: { body?: string; is_hidden?: boolean },
+) {
+  return apiFetch<BlogComment>(`/admin/blog/comments/${commentId}`, {
+    method: "PATCH",
+    json: input,
+  });
 }

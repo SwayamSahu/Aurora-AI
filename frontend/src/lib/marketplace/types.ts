@@ -47,6 +47,7 @@ export interface ListingCommentRead {
   body: string;
   author: ListingCommentAuthor;
   created_at: string;
+  is_hidden: boolean;
 }
 
 export interface ListingListResponse {
@@ -127,6 +128,25 @@ export interface PlanPurchaseRead {
   price_cents: number;
   credits_granted: number;
   created_at: string;
+}
+
+export interface AdminPlanRead {
+  id: string;
+  name: string;
+  price_cents: number;
+  credits_granted: number;
+  listing_quota: number;
+  is_active: boolean;
+  sort_order: number;
+}
+
+export interface AdminPlanInput {
+  name: string;
+  price_cents: number;
+  credits_granted: number;
+  listing_quota: number;
+  is_active?: boolean;
+  sort_order?: number;
 }
 
 export interface SellableAsset {
