@@ -4,6 +4,7 @@ import { getToken } from "@/lib/api/token";
 import type {
   CartRead,
   CreditPlanRead,
+  ListingCommentRead,
   ListingDetail,
   ListingListResponse,
   MarketplaceListing,
@@ -184,4 +185,29 @@ export function purchasePlan(planId: string) {
   return apiFetch<PlanPurchaseRead>(`/marketplace/plans/${planId}/purchase`, {
     method: "POST",
   });
+}
+
+// --------------------------------------------------------------------------- #
+// Engagement — likes + comments
+// --------------------------------------------------------------------------- #
+export function toggleListingLike(listingId: string, liked: boolean) {
+  return apiFetch<ListingDetail>(`/marketplace/listings/${listingId}/like`, {
+    method: "POST",
+    json: { liked },
+  });
+}
+
+export function getListingComments(listingId: string) {
+  return apiFetch<ListingCommentRead[]>(`/marketplace/listings/${listingId}/comments`);
+}
+
+export function addListingComment(listingId: string, body: string) {
+  return apiFetch<ListingCommentRead>(`/marketplace/listings/${listingId}/comments`, {
+    method: "POST",
+    json: { body },
+  });
+}
+
+export function deleteListingComment(commentId: string) {
+  return apiFetch<void>(`/marketplace/comments/${commentId}`, { method: "DELETE" });
 }

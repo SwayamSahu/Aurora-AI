@@ -1,13 +1,16 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import {
+  addListingComment,
   addToCart,
   checkout,
   createListing,
   deleteListing,
+  deleteListingComment,
   getCart,
   getCategoryCounts,
   getListing,
+  getListingComments,
   getSimilar,
   getMyListings,
   getMyOrders,
@@ -19,6 +22,7 @@ import {
   listPlans,
   purchasePlan,
   removeFromCart,
+  toggleListingLike,
   updateListing,
   type ListingInput,
   type ListingUpdateInput,
@@ -97,6 +101,47 @@ export function useDeleteListing() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["mk-listings"] });
       qc.invalidateQueries({ queryKey: ["mk-my-listings"] });
+    },
+  });
+}
+
+// --------------------------------------------------------------------------- #
+// Engagement — likes + comments
+// --------------------------------------------------------------------------- #
+export function useToggleListingLike(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (liked: boolean) => toggleListingLike(id, liked),
+    onSuccess: (updated) => qc.setQueryData(["mk-listing", id], updated),
+  });
+}
+
+export function useListingComments(id: string) {
+  return useQuery({
+    queryKey: ["mk-listing-comments", id],
+    queryFn: () => getListingComments(id),
+    enabled: !!id,
+  });
+}
+
+export function useAddListingComment(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) => addListingComment(id, body),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-listing-comments", id] });
+      qc.invalidateQueries({ queryKey: ["mk-listing", id] });
+    },
+  });
+}
+
+export function useDeleteListingComment(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (commentId: string) => deleteListingComment(commentId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-listing-comments", id] });
+      qc.invalidateQueries({ queryKey: ["mk-listing", id] });
     },
   });
 }

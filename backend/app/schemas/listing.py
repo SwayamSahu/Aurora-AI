@@ -69,7 +69,11 @@ class ListingSummary(BaseModel):
 
 
 class ListingDetail(ListingSummary):
-    pass
+    liked_by_me: bool = False
+    # The generation prompt/seed/model behind this listing, if it was
+    # AI-generated. Populated only for the seller or a buyer who purchased
+    # it — see `listings.py`'s `get_listing` — never for anyone else.
+    generation: dict | None = None
 
 
 class ListingListResponse(BaseModel):
@@ -87,3 +91,27 @@ class SellableAssetRead(BaseModel):
     duration_seconds: float | None
     width: int | None
     height: int | None
+
+
+class ListingAuthor(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    full_name: str | None = None
+
+
+class ListingCommentCreate(BaseModel):
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class ListingCommentRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    body: str
+    author: ListingAuthor
+    created_at: datetime
+
+
+class ListingLikeToggle(BaseModel):
+    liked: bool

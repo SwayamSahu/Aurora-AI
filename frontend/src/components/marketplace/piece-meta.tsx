@@ -1,10 +1,11 @@
 "use client";
 
-import { Heart, MessageSquare, Coins, Share2 } from "lucide-react";
+import { MessageSquare, Coins, Share2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import type { ListingDetail } from "@/lib/marketplace/types";
 import { formatCount, formatDuration } from "@/lib/marketplace/format";
+import { LikeButton } from "@/components/marketplace/like-button";
 
 export function PieceMeta({ piece }: { piece: ListingDetail }) {
   const kind = piece.kind === "video" ? "VIDEO" : "STILL";
@@ -64,9 +65,7 @@ export function PieceMeta({ piece }: { piece: ListingDetail }) {
 
       {/* Mini stat row */}
       <div className="mt-6 flex items-center gap-6 text-[13px] text-muted-foreground">
-        <span className="inline-flex items-center gap-1.5">
-          <Heart className="size-4" /> {formatCount(piece.like_count)}
-        </span>
+        <LikeButton piece={piece} />
         <span className="inline-flex items-center gap-1.5">
           <MessageSquare className="size-4" /> {formatCount(piece.comment_count)}
         </span>

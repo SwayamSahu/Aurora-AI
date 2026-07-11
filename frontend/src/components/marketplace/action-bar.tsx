@@ -3,7 +3,7 @@
 import * as React from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowRight, ChevronDown, Coins, ShoppingCart } from "lucide-react";
+import { ArrowRight, ChevronDown, Coins, Lock, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
 import { cn } from "@/lib/utils";
@@ -148,6 +148,30 @@ export function ActionBar({ piece, pulse }: { piece: ListingDetail; pulse?: bool
                 </span>
               ))}
             </div>
+          ) : null}
+
+          {piece.generation ? (
+            <div className="mt-4 border-t border-[var(--mk-border)] pt-4">
+              <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                Generation
+              </p>
+              {piece.generation.prompt ? (
+                <p className="mt-2 font-mono text-[13px] text-foreground/90">
+                  &ldquo;{piece.generation.prompt}&rdquo;
+                </p>
+              ) : null}
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted-foreground">
+                {piece.generation.model ? <span>Model: {piece.generation.model}</span> : null}
+                {piece.generation.seed !== undefined ? (
+                  <span>Seed: {piece.generation.seed}</span>
+                ) : null}
+              </div>
+            </div>
+          ) : !isOwnListing ? (
+            <p className="mt-4 flex items-center gap-1.5 border-t border-[var(--mk-border)] pt-4 text-[13px] font-semibold text-mk-lavender">
+              <Lock className="size-3.5" />
+              Buy this to reveal the prompt, model &amp; seed
+            </p>
           ) : null}
         </div>
       ) : null}

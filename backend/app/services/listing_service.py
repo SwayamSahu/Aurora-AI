@@ -8,11 +8,19 @@ module's `update()`.
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
-from app.db.models import Listing, ListingMedia, ListingStatus, User
+from app.db.models import (
+    Job,
+    Listing,
+    ListingComment,
+    ListingLike,
+    ListingMedia,
+    ListingStatus,
+    User,
+)
 from app.services import wallet_service
 from app.services.marketplace_errors import QuotaExceededError
 
@@ -208,3 +216,95 @@ def create_media(
 
 def get_media(db: Session, media_id: str) -> ListingMedia | None:
     return db.get(ListingMedia, media_id)
+
+
+# ----------------------------- engagement ------------------------------ #
+def is_liked_by(db: Session, listing_id: str, user_id: str | None) -> bool:
+    if not user_id:
+        return False
+    return (
+        db.scalar(
+            select(ListingLike.id).where(
+                ListingLike.listing_id == listing_id, ListingLike.user_id == user_id
+            )
+        )
+        is not None
+    )
+
+
+def set_like(db: Session, listing: Listing, user_id: str, liked: bool) -> Listing:
+    exists = db.scalar(
+        select(ListingLike).where(
+            ListingLike.listing_id == listing.id, ListingLike.user_id == user_id
+        )
+    )
+    if liked and exists is None:
+        db.add(ListingLike(listing_id=listing.id, user_id=user_id))
+    elif not liked and exists is not None:
+        db.execute(
+            delete(ListingLike).where(
+                ListingLike.listing_id == listing.id, ListingLike.user_id == user_id
+            )
+        )
+    db.flush()  # count the pending insert/delete under autoflush=False sessions
+    listing.like_count = (
+        db.scalar(
+            select(func.count(ListingLike.id)).where(
+                ListingLike.listing_id == listing.id
+            )
+        )
+        or 0
+    )
+    db.commit()
+    db.refresh(listing)
+    return listing
+
+
+def add_comment(
+    db: Session, listing: Listing, author_id: str, body: str
+) -> ListingComment:
+    comment = ListingComment(
+        listing_id=listing.id, author_id=author_id, body=body.strip()
+    )
+    db.add(comment)
+    listing.comment_count = listing.comment_count + 1
+    db.commit()
+    db.refresh(comment)
+    return comment
+
+
+def list_comments(db: Session, listing_id: str) -> list[ListingComment]:
+    return list(
+        db.scalars(
+            select(ListingComment)
+            .where(ListingComment.listing_id == listing_id)
+            .order_by(ListingComment.created_at.asc())
+        )
+    )
+
+
+def get_comment(db: Session, comment_id: str) -> ListingComment | None:
+    return db.get(ListingComment, comment_id)
+
+
+def delete_comment(db: Session, comment: ListingComment) -> None:
+    listing = db.get(Listing, comment.listing_id)
+    db.delete(comment)
+    if listing is not None:
+        listing.comment_count = max(0, listing.comment_count - 1)
+    db.commit()
+
+
+# --------------------------- generation reveal --------------------------- #
+def generation_meta(db: Session, listing: Listing) -> dict | None:
+    """The prompt/seed/model behind this listing's source asset, if it was
+    AI-generated (not uploaded). Callers must gate this behind an
+    ownership/purchase check — it is never safe to expose publicly."""
+    job = db.scalar(select(Job).where(Job.result_asset_id == listing.source_asset_id))
+    if job is None:
+        return None
+    params = job.params or {}
+    meta = {
+        k: params[k] for k in ("prompt", "seed", "model") if params.get(k) is not None
+    }
+    return meta or None

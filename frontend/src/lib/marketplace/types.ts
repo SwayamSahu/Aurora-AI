@@ -29,7 +29,25 @@ export interface MarketplaceListing {
   updated_at: string;
 }
 
-export type ListingDetail = MarketplaceListing;
+export interface ListingDetail extends MarketplaceListing {
+  liked_by_me: boolean;
+  // The generation prompt/seed/model behind this listing, if it was
+  // AI-generated — only ever populated for the seller or a buyer who
+  // purchased it (see backend `get_listing`), null for everyone else.
+  generation: { prompt?: string; seed?: number; model?: string } | null;
+}
+
+export interface ListingCommentAuthor {
+  id: string;
+  full_name: string | null;
+}
+
+export interface ListingCommentRead {
+  id: string;
+  body: string;
+  author: ListingCommentAuthor;
+  created_at: string;
+}
 
 export interface ListingListResponse {
   items: MarketplaceListing[];

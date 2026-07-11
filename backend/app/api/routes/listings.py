@@ -1,5 +1,6 @@
 """Marketplace listings (M2): public browse/search, owner CRUD, quota
-enforcement, and preview media. Cart/checkout land in M3."""
+enforcement, and preview media. Cart/checkout (M3) and real engagement —
+likes/comments, conditional generation-prompt reveal (M6)."""
 
 from __future__ import annotations
 
@@ -9,10 +10,13 @@ from typing import Annotated
 from fastapi import APIRouter, File, HTTPException, Query, Response, UploadFile, status
 
 from app.api.deps import CurrentUser, DbSession, OptionalUser
-from app.db.models import Listing
+from app.db.models import Listing, ListingComment
 from app.schemas.listing import (
+    ListingCommentCreate,
+    ListingCommentRead,
     ListingCreate,
     ListingDetail,
+    ListingLikeToggle,
     ListingListResponse,
     ListingMediaRead,
     ListingSummary,
@@ -101,16 +105,26 @@ def get_listing(
     listing = listing_service.get_by_id(db, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Listing not found.")
+
+    is_seller = current_user is not None and current_user.id == listing.seller_id
+    is_buyer = current_user is not None and order_service.buyer_has_purchased(
+        db, current_user.id, listing_id
+    )
     # Non-active listings are visible only to their seller, or to a buyer
     # who purchased them (so "sold" doesn't 404 the item you just bought).
-    if listing.status.value != "active":
-        is_seller = current_user is not None and current_user.id == listing.seller_id
-        is_buyer = current_user is not None and order_service.buyer_has_purchased(
-            db, current_user.id, listing_id
-        )
-        if not (is_seller or is_buyer):
-            raise HTTPException(status_code=404, detail="Listing not found.")
-    return _detail(listing)
+    if listing.status.value != "active" and not (is_seller or is_buyer):
+        raise HTTPException(status_code=404, detail="Listing not found.")
+
+    out = _detail(listing)
+    out.liked_by_me = listing_service.is_liked_by(
+        db, listing.id, current_user.id if current_user else None
+    )
+    # The generation prompt/seed is the seller's private data pre-purchase
+    # (it's effectively the "recipe") — only the seller or a buyer who
+    # already paid for it gets to see it.
+    if is_seller or is_buyer:
+        out.generation = listing_service.generation_meta(db, listing)
+    return out
 
 
 # --------------------------------------------------------------------------- #
@@ -206,3 +220,64 @@ def get_listing_media(media_id: str, db: DbSession) -> Response:
         media_type=media.content_type,
         headers={"Cache-Control": "public, max-age=31536000, immutable"},
     )
+
+
+# --------------------------------------------------------------------------- #
+# Engagement — likes + comments
+# --------------------------------------------------------------------------- #
+@router.post("/listings/{listing_id}/like", response_model=ListingDetail)
+def toggle_like(
+    listing_id: str,
+    data: ListingLikeToggle,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> ListingDetail:
+    listing = listing_service.get_by_id(db, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found.")
+    listing = listing_service.set_like(db, listing, current_user.id, data.liked)
+    out = _detail(listing)
+    out.liked_by_me = data.liked
+    return out
+
+
+@router.get("/listings/{listing_id}/comments", response_model=list[ListingCommentRead])
+def get_comments(listing_id: str, db: DbSession) -> list[ListingCommentRead]:
+    listing = listing_service.get_by_id(db, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found.")
+    return [
+        ListingCommentRead.model_validate(c)
+        for c in listing_service.list_comments(db, listing.id)
+    ]
+
+
+@router.post(
+    "/listings/{listing_id}/comments",
+    response_model=ListingCommentRead,
+    status_code=201,
+)
+def create_comment(
+    listing_id: str,
+    data: ListingCommentCreate,
+    current_user: CurrentUser,
+    db: DbSession,
+) -> ListingCommentRead:
+    listing = listing_service.get_by_id(db, listing_id)
+    if listing is None:
+        raise HTTPException(status_code=404, detail="Listing not found.")
+    comment = listing_service.add_comment(db, listing, current_user.id, data.body)
+    return ListingCommentRead.model_validate(comment)
+
+
+@router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_comment(
+    comment_id: str, current_user: CurrentUser, db: DbSession
+) -> Response:
+    comment: ListingComment | None = listing_service.get_comment(db, comment_id)
+    if comment is None:
+        raise HTTPException(status_code=404, detail="Comment not found.")
+    if comment.author_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Not your comment.")
+    listing_service.delete_comment(db, comment)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
