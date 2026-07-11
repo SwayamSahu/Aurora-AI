@@ -89,7 +89,74 @@ def get_for_owner(db: Session, owner_id: str, asset_id: str) -> Asset | None:
     )
 
 
+def list_for_owner_across_projects(
+    db: Session, owner_id: str, *, kind: AssetKind | None = None
+) -> list[Asset]:
+    """All of a user's assets across every project — used by the marketplace
+    listing picker, which lets a seller list any of their own creations."""
+    stmt = (
+        select(Asset)
+        .join(Project, Project.id == Asset.project_id)
+        .where(Project.owner_id == owner_id)
+    )
+    if kind is not None:
+        stmt = stmt.where(Asset.kind == kind)
+    stmt = stmt.order_by(Asset.created_at.desc())
+    return list(db.scalars(stmt).all())
+
+
 def delete(db: Session, asset: Asset) -> None:
     get_storage().delete(asset.storage_key)
     db.delete(asset)
     db.commit()
+
+
+_PURCHASED_PROJECT_NAME = "Purchased"
+
+
+def _get_or_create_purchased_project(db: Session, buyer_id: str) -> Project:
+    """Marketplace purchases land in one auto-created library project per
+    buyer, so bought clips show up in the editor like anything else they own."""
+    project = db.scalar(
+        select(Project).where(
+            Project.owner_id == buyer_id, Project.name == _PURCHASED_PROJECT_NAME
+        )
+    )
+    if project is not None:
+        return project
+    project = Project(
+        owner_id=buyer_id,
+        name=_PURCHASED_PROJECT_NAME,
+        description="Creations you've bought from the marketplace.",
+    )
+    db.add(project)
+    db.flush()
+    return project
+
+
+def clone_for_buyer(db: Session, source: Asset, buyer_id: str) -> Asset:
+    """Copies `source`'s bytes into a new Asset the buyer fully owns —
+    the mechanism behind 'buying' a listing (see `checkout_service`).
+    Does not commit; caller owns the transaction boundary."""
+    project = _get_or_create_purchased_project(db, buyer_id)
+    data = get_storage().get(source.storage_key)
+
+    asset_id = str(uuid.uuid4())
+    key = f"projects/{project.id}/{asset_id}/{_safe_name(source.name)}"
+    get_storage().put(key, data, source.content_type)
+
+    clone = Asset(
+        id=asset_id,
+        project_id=project.id,
+        name=source.name,
+        kind=source.kind,
+        source=AssetSource.DERIVED,
+        storage_key=key,
+        content_type=source.content_type,
+        duration_seconds=source.duration_seconds,
+        width=source.width,
+        height=source.height,
+    )
+    db.add(clone)
+    db.flush()
+    return clone

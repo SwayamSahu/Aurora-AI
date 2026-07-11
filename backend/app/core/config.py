@@ -78,9 +78,7 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = 60 * 24
 
     # --- CORS ---
-    cors_origins: list[str] = Field(
-        default_factory=lambda: ["http://localhost:3000"]
-    )
+    cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:3000"])
 
     # --- Database ---
     database_url: str = "postgresql+psycopg2://aurora:aurora@localhost:5432/aurora"
@@ -125,6 +123,12 @@ class Settings(BaseSettings):
 
     # faster-whisper model size for transcription
     whisper_model: str = "base"
+
+    # --- Marketplace ---
+    # Cut of each sale's credits the platform keeps; the rest goes to the
+    # seller's wallet. No platform wallet exists in v1 — the fee amount is
+    # simply not credited anywhere (retained implicitly).
+    marketplace_platform_fee: float = 0.10
 
     @field_validator("debug", mode="before")
     @classmethod
