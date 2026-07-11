@@ -1,60 +1,177 @@
-/**
- * Infinite-scroll data layer for the gallery. Backs onto the mock dataset
- * today, paging + cycling it so the wall keeps filling like a real catalog.
- * Swap fetchPiecesPage for an `apiFetch("/pieces?cursor=…")` call later.
- */
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import { MOCK_PIECES, type Piece } from "./mock-pieces";
+import {
+  addToCart,
+  checkout,
+  createListing,
+  deleteListing,
+  getCart,
+  getCategoryCounts,
+  getListing,
+  getSimilar,
+  getMyListings,
+  getMyOrders,
+  getMySales,
+  getMySellableAssets,
+  getWallet,
+  getWalletTransactions,
+  listListings,
+  listPlans,
+  purchasePlan,
+  removeFromCart,
+  updateListing,
+  type ListingInput,
+  type ListingUpdateInput,
+} from "@/lib/marketplace/api";
 
-const PAGE_SIZE = 12;
-const MAX_PAGES = 14;
+const PAGE_SIZE = 24;
 
-export interface PiecesPage {
-  items: Piece[];
-  nextCursor: number | null;
-}
-
-const SPECIAL = new Set(["all", "fresh", "for-you", "trending"]);
-
-function filterBase(active: string, query: string): Piece[] {
-  const q = query.trim().toLowerCase();
-  return MOCK_PIECES.filter((p) => {
-    const matchesChip = SPECIAL.has(active) || p.category === active;
-    const matchesQuery =
-      !q || p.title.toLowerCase().includes(q) || p.category.includes(q);
-    return matchesChip && matchesQuery;
+export function useListingsInfinite(category: string, query: string, sort = "recent") {
+  return useInfiniteQuery({
+    queryKey: ["mk-listings", category, query, sort],
+    queryFn: ({ pageParam }) =>
+      listListings({ category, q: query, sort, limit: PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next_offset,
   });
 }
 
-function delay(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+export function useCategoryCounts() {
+  return useQuery({ queryKey: ["mk-categories"], queryFn: getCategoryCounts });
 }
 
-async function fetchPiecesPage(
-  active: string,
-  query: string,
-  page: number,
-): Promise<PiecesPage> {
-  // Simulated latency so skeleton shimmer is visible.
-  await delay(page === 0 ? 250 : 450);
-
-  const base = filterBase(active, query);
-  if (base.length === 0) return { items: [], nextCursor: null };
-
-  const items = Array.from(
-    { length: PAGE_SIZE },
-    (_, i) => base[(page * PAGE_SIZE + i) % base.length],
-  );
-  const nextCursor = page + 1 < MAX_PAGES ? page + 1 : null;
-  return { items, nextCursor };
+export function useListing(id: string) {
+  return useQuery({
+    queryKey: ["mk-listing", id],
+    queryFn: () => getListing(id),
+    enabled: !!id,
+  });
 }
 
-export function usePiecesInfinite(active: string, query: string) {
-  return useInfiniteQuery({
-    queryKey: ["mk-pieces", active, query],
-    queryFn: ({ pageParam }) => fetchPiecesPage(active, query, pageParam),
-    initialPageParam: 0,
-    getNextPageParam: (last) => last.nextCursor,
+export function useSimilarListings(id: string, category: string) {
+  return useQuery({
+    queryKey: ["mk-similar", id, category],
+    queryFn: () => getSimilar(id, category),
+    enabled: !!id && !!category,
+  });
+}
+
+export function useMyListings() {
+  return useQuery({ queryKey: ["mk-my-listings"], queryFn: getMyListings });
+}
+
+export function useMySellableAssets() {
+  return useQuery({ queryKey: ["mk-my-assets"], queryFn: getMySellableAssets });
+}
+
+export function useCreateListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: ListingInput) => createListing(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-listings"] });
+      qc.invalidateQueries({ queryKey: ["mk-my-listings"] });
+      qc.invalidateQueries({ queryKey: ["mk-categories"] });
+      qc.invalidateQueries({ queryKey: ["mk-wallet"] });
+    },
+  });
+}
+
+export function useUpdateListing(id?: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id: listingId, input }: { id: string; input: ListingUpdateInput }) =>
+      updateListing(listingId, input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-listings"] });
+      qc.invalidateQueries({ queryKey: ["mk-my-listings"] });
+      if (id) qc.invalidateQueries({ queryKey: ["mk-listing", id] });
+    },
+  });
+}
+
+export function useDeleteListing() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => deleteListing(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-listings"] });
+      qc.invalidateQueries({ queryKey: ["mk-my-listings"] });
+    },
+  });
+}
+
+// --------------------------------------------------------------------------- #
+// Cart + checkout + orders
+// --------------------------------------------------------------------------- #
+export function useCart() {
+  return useQuery({ queryKey: ["mk-cart"], queryFn: getCart });
+}
+
+export function useAddToCart() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (listingId: string) => addToCart(listingId),
+    onSuccess: (cart) => qc.setQueryData(["mk-cart"], cart),
+  });
+}
+
+export function useRemoveFromCart() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (cartItemId: string) => removeFromCart(cartItemId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mk-cart"] }),
+  });
+}
+
+export function useCheckout() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => checkout(),
+    onSuccess: (order) => {
+      qc.invalidateQueries({ queryKey: ["mk-cart"] });
+      qc.invalidateQueries({ queryKey: ["mk-wallet"] });
+      qc.invalidateQueries({ queryKey: ["mk-orders"] });
+      qc.invalidateQueries({ queryKey: ["mk-listings"] });
+      for (const item of order.items) {
+        if (item.listing_id) {
+          qc.invalidateQueries({ queryKey: ["mk-listing", item.listing_id] });
+        }
+      }
+    },
+  });
+}
+
+export function useMyOrders() {
+  return useQuery({ queryKey: ["mk-orders"], queryFn: getMyOrders });
+}
+
+export function useMySales() {
+  return useQuery({ queryKey: ["mk-sales"], queryFn: getMySales });
+}
+
+// --------------------------------------------------------------------------- #
+// Wallet + plans
+// --------------------------------------------------------------------------- #
+export function useWallet() {
+  return useQuery({ queryKey: ["mk-wallet"], queryFn: getWallet });
+}
+
+export function useWalletTransactions(limit = 24, offset = 0) {
+  return useQuery({
+    queryKey: ["mk-wallet-tx", limit, offset],
+    queryFn: () => getWalletTransactions(limit, offset),
+  });
+}
+
+export function usePlans() {
+  return useQuery({ queryKey: ["mk-plans"], queryFn: listPlans });
+}
+
+export function usePurchasePlan() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (planId: string) => purchasePlan(planId),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mk-wallet"] }),
   });
 }

@@ -24,7 +24,7 @@ router = APIRouter(prefix="/marketplace", tags=["marketplace"])
 def _cart_item_read(item: CartItem) -> CartItemRead:
     return CartItemRead(
         id=item.id,
-        listing=listing_service.with_cover_url(ListingSummary, item.listing),
+        listing=listing_service.to_read(ListingSummary, item.listing),
         created_at=item.created_at,
     )
 

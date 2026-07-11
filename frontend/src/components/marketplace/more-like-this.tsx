@@ -1,4 +1,4 @@
-import type { Piece } from "@/lib/marketplace/mock-pieces";
+import type { MarketplaceListing } from "@/lib/marketplace/types";
 import { PieceCard } from "@/components/marketplace/piece-card";
 
 export function MoreLikeThis({
@@ -6,8 +6,9 @@ export function MoreLikeThis({
   pieces,
 }: {
   category: string;
-  pieces: Piece[];
+  pieces: MarketplaceListing[];
 }) {
+  if (pieces.length === 0) return null;
   return (
     <aside>
       <p className="text-[12px] font-semibold uppercase tracking-[1.5px] text-mk-lavender">

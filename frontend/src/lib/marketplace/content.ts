@@ -1,6 +1,7 @@
 /**
  * Aurora Explore marketplace — single source of truth for chrome copy.
- * (Piece/category data lives in mock-pieces.ts; this file is UI text only.)
+ * Listing/category data comes from the real API (see queries.ts); this
+ * file is UI text only.
  */
 
 export interface MkNavLink {

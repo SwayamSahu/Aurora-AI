@@ -9,12 +9,14 @@ module's `update()`.
 from __future__ import annotations
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
 from app.db.models import Listing, ListingMedia, ListingStatus, User
 from app.services import wallet_service
 from app.services.marketplace_errors import QuotaExceededError
+
+_EAGER = (selectinload(Listing.source_asset), selectinload(Listing.cover_media))
 
 
 def media_url(media_id: str) -> str:
@@ -25,11 +27,22 @@ def cover_url(listing: Listing) -> str | None:
     return media_url(listing.cover_media_id) if listing.cover_media_id else None
 
 
-def with_cover_url(schema_cls, listing: Listing):
-    """Validates `listing` into `schema_cls` (which must have a `cover_url`
-    field) and fills it in — the ORM has no such column, it's derived."""
+def to_read(schema_cls, listing: Listing):
+    """Validates `listing` into `schema_cls` and fills in the fields the ORM
+    doesn't carry directly: the public preview URL/type, and the product's
+    shape (kind/dimensions/duration) mirrored from the private source asset.
+    Requires `listing.source_asset` (and `.cover_media`, if set) to already
+    be loaded — see `_EAGER` in the query functions above."""
     data = schema_cls.model_validate(listing)
     data.cover_url = cover_url(listing)
+    data.cover_content_type = (
+        listing.cover_media.content_type if listing.cover_media else None
+    )
+    asset = listing.source_asset
+    data.kind = asset.kind.value
+    data.width = asset.width
+    data.height = asset.height
+    data.duration_seconds = asset.duration_seconds
     return data
 
 
@@ -90,7 +103,7 @@ def create(db: Session, seller: User, data) -> Listing:
 
 
 def get_by_id(db: Session, listing_id: str) -> Listing | None:
-    return db.get(Listing, listing_id)
+    return db.scalar(select(Listing).where(Listing.id == listing_id).options(*_EAGER))
 
 
 def get_for_owner(db: Session, seller_id: str, listing_id: str) -> Listing | None:
@@ -136,7 +149,9 @@ def list_active(
     limit: int = 24,
     offset: int = 0,
 ) -> tuple[list[Listing], int]:
-    stmt = select(Listing).where(Listing.status == ListingStatus.ACTIVE)
+    stmt = (
+        select(Listing).where(Listing.status == ListingStatus.ACTIVE).options(*_EAGER)
+    )
     if category and category != "all":
         stmt = stmt.where(Listing.category == category)
     if query:
@@ -163,6 +178,7 @@ def list_for_seller(db: Session, seller_id: str) -> list[Listing]:
         db.scalars(
             select(Listing)
             .where(Listing.seller_id == seller_id)
+            .options(*_EAGER)
             .order_by(Listing.updated_at.desc())
         )
     )

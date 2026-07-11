@@ -28,3 +28,17 @@ def list_sales_for_seller(db: Session, seller_id: str) -> list[OrderItem]:
             .order_by(OrderItem.created_at.desc())
         )
     )
+
+
+def buyer_has_purchased(db: Session, buyer_id: str, listing_id: str) -> bool:
+    """Whether `buyer_id` has an order containing `listing_id` — used to let
+    buyers keep viewing a listing's detail page after it goes non-active
+    (sold out from under them), not just its seller."""
+    return (
+        db.scalar(
+            select(OrderItem.id)
+            .join(Order, Order.id == OrderItem.order_id)
+            .where(Order.buyer_id == buyer_id, OrderItem.listing_id == listing_id)
+        )
+        is not None
+    )

@@ -46,6 +46,7 @@ class ListingSummary(BaseModel):
 
     id: str
     title: str
+    description: str | None
     category: str
     tags: list[str]
     price_credits: int
@@ -55,13 +56,20 @@ class ListingSummary(BaseModel):
     comment_count: int
     cover_media_id: str | None
     cover_url: str | None = None
+    cover_content_type: str | None = None
+    # Derived from the (private) source asset — safe to expose, since it
+    # describes the product's shape, not its content.
+    kind: str = "video"
+    width: int | None = None
+    height: int | None = None
+    duration_seconds: float | None = None
     seller: ListingSeller
     created_at: datetime
     updated_at: datetime
 
 
 class ListingDetail(ListingSummary):
-    description: str | None
+    pass
 
 
 class ListingListResponse(BaseModel):

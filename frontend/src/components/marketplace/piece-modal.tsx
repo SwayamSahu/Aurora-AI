@@ -4,17 +4,15 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 
-import type { Piece } from "@/lib/marketplace/mock-pieces";
+import type { ListingDetail, MarketplaceListing } from "@/lib/marketplace/types";
 import { PieceDetail } from "@/components/marketplace/piece-detail";
 
 export function PieceModal({
   piece,
   similar,
-  number,
 }: {
-  piece: Piece;
-  similar: Piece[];
-  number: string;
+  piece: ListingDetail;
+  similar: MarketplaceListing[];
 }) {
   const router = useRouter();
   const reduce = useReducedMotion();
@@ -57,13 +55,7 @@ export function PieceModal({
           }}
         >
           <div onClick={(e) => e.stopPropagation()}>
-            <PieceDetail
-              piece={piece}
-              similar={similar}
-              number={number}
-              onBack={close}
-              pulse
-            />
+            <PieceDetail piece={piece} similar={similar} onBack={close} pulse />
           </div>
         </div>
       </motion.div>

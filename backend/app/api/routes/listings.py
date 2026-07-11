@@ -19,7 +19,7 @@ from app.schemas.listing import (
     ListingUpdate,
     SellableAssetRead,
 )
-from app.services import asset_service, listing_service
+from app.services import asset_service, listing_service, order_service
 from app.services.marketplace_errors import MarketplaceError
 from app.storage import get_storage
 
@@ -30,11 +30,11 @@ MAX_MEDIA_BYTES = 50 * 1024 * 1024  # 50 MB
 
 
 def _summary(listing: Listing) -> ListingSummary:
-    return listing_service.with_cover_url(ListingSummary, listing)
+    return listing_service.to_read(ListingSummary, listing)
 
 
 def _detail(listing: Listing) -> ListingDetail:
-    return listing_service.with_cover_url(ListingDetail, listing)
+    return listing_service.to_read(ListingDetail, listing)
 
 
 # --------------------------------------------------------------------------- #
@@ -101,11 +101,15 @@ def get_listing(
     listing = listing_service.get_by_id(db, listing_id)
     if listing is None:
         raise HTTPException(status_code=404, detail="Listing not found.")
-    # Non-active listings are visible only to their seller.
-    if listing.status.value != "active" and (
-        current_user is None or current_user.id != listing.seller_id
-    ):
-        raise HTTPException(status_code=404, detail="Listing not found.")
+    # Non-active listings are visible only to their seller, or to a buyer
+    # who purchased them (so "sold" doesn't 404 the item you just bought).
+    if listing.status.value != "active":
+        is_seller = current_user is not None and current_user.id == listing.seller_id
+        is_buyer = current_user is not None and order_service.buyer_has_purchased(
+            db, current_user.id, listing_id
+        )
+        if not (is_seller or is_buyer):
+            raise HTTPException(status_code=404, detail="Listing not found.")
     return _detail(listing)
 
 

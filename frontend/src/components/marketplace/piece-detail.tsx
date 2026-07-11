@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
-import type { Piece } from "@/lib/marketplace/mock-pieces";
+import type { ListingDetail, MarketplaceListing } from "@/lib/marketplace/types";
 import { FeaturedMedia } from "@/components/marketplace/featured-media";
 import { PieceMeta } from "@/components/marketplace/piece-meta";
 import { ActionBar } from "@/components/marketplace/action-bar";
@@ -13,14 +13,12 @@ import { MoreLikeThis } from "@/components/marketplace/more-like-this";
 export function PieceDetail({
   piece,
   similar,
-  number,
   backHref,
   onBack,
   pulse,
 }: {
-  piece: Piece;
-  similar: Piece[];
-  number: string;
+  piece: ListingDetail;
+  similar: MarketplaceListing[];
   backHref?: string;
   onBack?: () => void;
   pulse?: boolean;
@@ -48,7 +46,6 @@ export function PieceDetail({
         <p className="font-mono text-[12px] font-semibold uppercase tracking-[1.5px]">
           <span className="mr-3 inline-block h-px w-8 align-middle bg-[var(--mk-border-strong)]" />
           <span className="text-mk-lavender">{piece.category}</span>
-          <span className="ml-2 text-muted-foreground">· #{number}</span>
         </p>
       </div>
 

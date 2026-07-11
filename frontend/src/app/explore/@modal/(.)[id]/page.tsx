@@ -1,22 +1,16 @@
-import { notFound } from "next/navigation";
+"use client";
 
-import { getPieceById, getSimilar, getPieceNumber } from "@/lib/marketplace/api";
+import { useParams } from "next/navigation";
+
+import { useListing, useSimilarListings } from "@/lib/marketplace/queries";
 import { PieceModal } from "@/components/marketplace/piece-modal";
 
-export default async function InterceptedPiece({
-  params,
-}: {
-  params: Promise<{ id: string }>;
-}) {
-  const { id } = await params;
-  const piece = getPieceById(id);
-  if (!piece) notFound();
+export default function InterceptedPiece() {
+  const params = useParams<{ id: string }>();
+  const { data: piece, isLoading, isError } = useListing(params.id);
+  const { data: similar } = useSimilarListings(params.id, piece?.category ?? "");
 
-  return (
-    <PieceModal
-      piece={piece}
-      similar={getSimilar(id)}
-      number={getPieceNumber(id)}
-    />
-  );
+  if (isLoading || isError || !piece) return null;
+
+  return <PieceModal piece={piece} similar={similar ?? []} />;
 }

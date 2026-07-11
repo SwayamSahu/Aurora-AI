@@ -1,4 +1,4 @@
-import type { Piece } from "@/lib/marketplace/mock-pieces";
+import type { MarketplaceListing } from "@/lib/marketplace/types";
 import { PieceCard } from "@/components/marketplace/piece-card";
 import { SkeletonCard } from "@/components/marketplace/skeleton-card";
 
@@ -6,14 +6,14 @@ const SKELETON_HEIGHTS = [240, 320, 200, 360, 280, 300, 220, 340, 260, 300, 230,
 
 /**
  * True masonry via CSS columns (60fps, no JS reflow). Cards use
- * break-inside-avoid so they never split across columns. Pieces may repeat
+ * break-inside-avoid so they never split across columns. Listings may repeat
  * across infinite-scroll pages, so keys are composite.
  */
 export function MasonryGrid({
   pieces,
   loadingCount = 0,
 }: {
-  pieces: Piece[];
+  pieces: MarketplaceListing[];
   loadingCount?: number;
 }) {
   if (pieces.length === 0 && loadingCount === 0) {
