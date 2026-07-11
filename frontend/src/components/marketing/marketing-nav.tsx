@@ -63,6 +63,12 @@ export function MarketingNav() {
           >
             Explore
           </Link>
+          <Link
+            href="/blog"
+            className="rounded-md px-3 py-2 text-sm font-medium text-foreground transition-colors hover:text-primary"
+          >
+            Blogs
+          </Link>
         </div>
 
         {/* Desktop actions */}
@@ -111,6 +117,13 @@ export function MarketingNav() {
               className="rounded-md px-3 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-accent"
             >
               Explore
+            </Link>
+            <Link
+              href="/blog"
+              onClick={() => setOpen(false)}
+              className="rounded-md px-3 py-2.5 text-sm font-semibold text-primary transition-colors hover:bg-accent"
+            >
+              Blogs
             </Link>
             <div className="mt-3 flex flex-col gap-2">
               <Button variant="outline" asChild>

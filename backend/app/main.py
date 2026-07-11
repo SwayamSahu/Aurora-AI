@@ -2,12 +2,17 @@
 
 from __future__ import annotations
 
-from fastapi import FastAPI
+import logging
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 
 from app import __version__
 from app.api.router import api_router
-from app.core.config import settings
+from app.core.config import Environment, settings
+
+logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title=f"{settings.app_name} API",

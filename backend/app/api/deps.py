@@ -43,6 +43,29 @@ def get_current_user(
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
+_optional_scheme = OAuth2PasswordBearer(
+    tokenUrl=f"{settings.api_v1_prefix}/auth/login", auto_error=False
+)
+
+
+def get_optional_user(
+    db: DbSession,
+    token: Annotated[str | None, Depends(_optional_scheme)] = None,
+) -> User | None:
+    """Auth that never rejects — returns the user when a valid token is
+    present, else None. For public reads that still personalize (liked-by-me)."""
+    if not token:
+        return None
+    try:
+        user_id = decode_token(token, expected_type=TokenType.ACCESS)
+    except ValueError:
+        return None
+    user = user_service.get_by_id(db, user_id)
+    return user if user and user.is_active else None
+
+
+OptionalUser = Annotated[User | None, Depends(get_optional_user)]
+
 
 def get_current_user_flexible(
     db: DbSession,

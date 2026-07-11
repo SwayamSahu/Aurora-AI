@@ -7,10 +7,11 @@ import { useAuth } from "@/components/auth/auth-provider";
 import { updateProfile } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import {
+  ASPECT_RATIOS,
+  aspectFromLegacyResolution,
   DEFAULT_GENERATION,
   DURATIONS,
   type GenerationDefaults,
-  RESOLUTIONS,
   VIDEO_MODELS,
 } from "@/lib/generation-options";
 import { Button } from "@/components/ui/button";
@@ -32,12 +33,17 @@ import {
 } from "@/components/ui/card";
 
 function readDefaults(prefs: Record<string, unknown> | undefined): GenerationDefaults {
+  // Back-compat: older saved prefs stored a "WxH" resolution string instead
+  // of an aspect ratio id — map it to the closest aspect so it keeps working.
+  const legacyResolution = prefs?.default_resolution as string | undefined;
   return {
     default_model:
       (prefs?.default_model as string) ?? DEFAULT_GENERATION.default_model,
-    default_resolution:
-      (prefs?.default_resolution as string) ??
-      DEFAULT_GENERATION.default_resolution,
+    default_aspect:
+      (prefs?.default_aspect as string) ??
+      (legacyResolution
+        ? aspectFromLegacyResolution(legacyResolution)
+        : DEFAULT_GENERATION.default_aspect),
     default_duration:
       (prefs?.default_duration as string) ?? DEFAULT_GENERATION.default_duration,
   };
@@ -51,7 +57,7 @@ export function GenerationSettings() {
 
   const dirty =
     values.default_model !== initial.default_model ||
-    values.default_resolution !== initial.default_resolution ||
+    values.default_aspect !== initial.default_aspect ||
     values.default_duration !== initial.default_duration;
 
   function set<K extends keyof GenerationDefaults>(key: K, v: string) {
@@ -103,18 +109,18 @@ export function GenerationSettings() {
         </div>
 
         <div className="space-y-1.5">
-          <Label>Resolution</Label>
+          <Label>Aspect ratio</Label>
           <Select
-            value={values.default_resolution}
-            onValueChange={(v) => set("default_resolution", v)}
+            value={values.default_aspect}
+            onValueChange={(v) => set("default_aspect", v)}
           >
             <SelectTrigger>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {RESOLUTIONS.map((r) => (
-                <SelectItem key={r.value} value={r.value}>
-                  {r.label}
+              {ASPECT_RATIOS.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.label}
                 </SelectItem>
               ))}
             </SelectContent>

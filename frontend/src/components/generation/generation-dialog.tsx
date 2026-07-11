@@ -10,8 +10,10 @@ import { useCreateJob } from "@/lib/query/jobs";
 import { useJobProgress } from "@/lib/ws/use-job-progress";
 import { useProjects } from "@/lib/query/projects";
 import {
+  ASPECT_RATIOS,
+  DEFAULT_ASPECT_RATIO,
   DURATIONS,
-  RESOLUTIONS,
+  resolutionForAspect,
   VIDEO_MODELS,
 } from "@/lib/generation-options";
 import { Button } from "@/components/ui/button";
@@ -62,7 +64,7 @@ export function GenerationDialog({
   );
   const [prompt, setPrompt] = React.useState("");
   const [model, setModel] = React.useState<string>(VIDEO_MODELS[0].value);
-  const [resolution, setResolution] = React.useState("768x512");
+  const [aspect, setAspect] = React.useState(DEFAULT_ASPECT_RATIO);
   const [duration, setDuration] = React.useState("4");
 
   const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
@@ -91,17 +93,17 @@ export function GenerationDialog({
       toast.error("Enter a prompt.");
       return;
     }
-    const [w, h] = resolution.split("x").map(Number);
+    const size = resolutionForAspect(aspect);
     const params =
       type === "generate_video"
         ? {
             prompt,
             model,
-            width: w,
-            height: h,
+            width: size?.width,
+            height: size?.height,
             duration_seconds: Number(duration),
           }
-        : { prompt };
+        : { prompt, width: size?.width, height: size?.height };
     try {
       const job = await create.mutateAsync({ type, params });
       if (["succeeded", "failed", "cancelled"].includes(job.status)) {
@@ -208,15 +210,15 @@ export function GenerationDialog({
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Resolution</Label>
-                  <Select value={resolution} onValueChange={setResolution}>
+                  <Label>Aspect ratio</Label>
+                  <Select value={aspect} onValueChange={setAspect}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {RESOLUTIONS.map((r) => (
-                        <SelectItem key={r.value} value={r.value}>
-                          {r.label}
+                      {ASPECT_RATIOS.map((a) => (
+                        <SelectItem key={a.id} value={a.id}>
+                          {a.label}
                         </SelectItem>
                       ))}
                     </SelectContent>

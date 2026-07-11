@@ -5,8 +5,9 @@ import { Wand2, Image as ImageIcon, Sparkles, Dices, Loader2 } from "lucide-reac
 
 import { cn } from "@/lib/utils";
 import {
+  ASPECT_RATIOS,
+  DEFAULT_ASPECT_RATIO,
   DURATIONS,
-  RESOLUTIONS,
   VIDEO_MODELS,
 } from "@/lib/generation-options";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ export interface ComposerState {
   prompt: string;
   negativePrompt: string;
   model: string;
-  resolution: string;
+  aspect: string;
   duration: string;
   seed: string;
   presets: Set<string>;
@@ -42,7 +43,7 @@ export const initialComposerState = (
   prompt: "",
   negativePrompt: "",
   model: VIDEO_MODELS[0].value,
-  resolution: "768x512",
+  aspect: DEFAULT_ASPECT_RATIO,
   duration: "4",
   seed: "",
   presets: new Set(),
@@ -160,42 +161,43 @@ export function PromptComposer({ state, onChange, onGenerate, busy }: Props) {
         />
       </div>
 
-      {/* Video-only controls */}
+      {/* Video-only: model */}
       {isVideo ? (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="col-span-2 space-y-1.5">
-            <Label>Model</Label>
-            <Select value={state.model} onValueChange={(v) => onChange({ model: v })}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {VIDEO_MODELS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
-                    {m.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label>Resolution</Label>
-            <Select
-              value={state.resolution}
-              onValueChange={(v) => onChange({ resolution: v })}
-            >
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {RESOLUTIONS.map((r) => (
-                  <SelectItem key={r.value} value={r.value}>
-                    {r.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+        <div className="space-y-1.5">
+          <Label>Model</Label>
+          <Select value={state.model} onValueChange={(v) => onChange({ model: v })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {VIDEO_MODELS.map((m) => (
+                <SelectItem key={m.value} value={m.value}>
+                  {m.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      {/* Aspect ratio — applies to both video and image generation */}
+      <div className={cn("grid gap-3", isVideo ? "grid-cols-2" : "grid-cols-1")}>
+        <div className="space-y-1.5">
+          <Label>Aspect ratio</Label>
+          <Select value={state.aspect} onValueChange={(v) => onChange({ aspect: v })}>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {ASPECT_RATIOS.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        {isVideo ? (
           <div className="space-y-1.5">
             <Label>Duration</Label>
             <Select
@@ -214,8 +216,8 @@ export function PromptComposer({ state, onChange, onGenerate, busy }: Props) {
               </SelectContent>
             </Select>
           </div>
-        </div>
-      ) : null}
+        ) : null}
+      </div>
 
       {/* Seed */}
       <div className="space-y-1.5">

@@ -26,3 +26,6 @@ bcrypt==4.0.1
 
 # Utilities
 httpx==0.28.1
+
+# HTML sanitization for user-authored blog bodies (Rust `ammonia` bindings).
+nh3==0.2.20

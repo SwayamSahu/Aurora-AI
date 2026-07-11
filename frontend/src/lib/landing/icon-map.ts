@@ -5,6 +5,7 @@
  */
 
 import {
+  BookOpen,
   Captions,
   Code2,
   Download,
@@ -13,16 +14,21 @@ import {
   Layers,
   Mic,
   Music,
+  Newspaper,
+  PenLine,
   Scissors,
   Shield,
   Sparkles,
+  Trophy,
   Video,
   Wand2,
+  Workflow,
   Zap,
   type LucideIcon,
 } from "lucide-react";
 
 const ICONS: Record<string, LucideIcon> = {
+  BookOpen,
   Captions,
   Code2,
   Download,
@@ -31,11 +37,15 @@ const ICONS: Record<string, LucideIcon> = {
   Layers,
   Mic,
   Music,
+  Newspaper,
+  PenLine,
   Scissors,
   Shield,
   Sparkles,
+  Trophy,
   Video,
   Wand2,
+  Workflow,
   Zap,
 };
 

@@ -6,12 +6,81 @@ export const VIDEO_MODELS = [
   { value: "wan-2.1", label: "Wan 2.1" },
 ] as const;
 
-export const RESOLUTIONS = [
-  { value: "512x512", label: "512 × 512 (square)" },
-  { value: "768x512", label: "768 × 512 (landscape)" },
-  { value: "512x768", label: "512 × 768 (portrait)" },
-  { value: "1024x576", label: "1024 × 576 (16:9)" },
-] as const;
+/**
+ * Aspect ratio picker — the primary way users choose output shape (mirrors
+ * the Auto/16:9/9:16/… pattern used by leading AI video platforms).
+ * `ratio` is undefined for "auto" (let the generator pick its own default).
+ */
+export interface AspectRatio {
+  id: string;
+  label: string;
+  /** width / height, e.g. 16/9. Omitted for "auto". */
+  ratio?: number;
+}
+
+export const ASPECT_RATIOS: AspectRatio[] = [
+  { id: "auto", label: "Auto" },
+  { id: "16:9", label: "16:9", ratio: 16 / 9 },
+  { id: "9:16", label: "9:16", ratio: 9 / 16 },
+  { id: "4:3", label: "4:3", ratio: 4 / 3 },
+  { id: "3:4", label: "3:4", ratio: 3 / 4 },
+  { id: "1:1", label: "1:1", ratio: 1 },
+  { id: "21:9", label: "21:9", ratio: 21 / 9 },
+];
+
+export const DEFAULT_ASPECT_RATIO = "16:9";
+
+/** Long side (px) used to derive concrete dimensions from an aspect ratio.
+ * Kept modest for the CPU/mock backend; real CUDA models may clamp further
+ * to their own supported sizes once Phase 9 is active. */
+const ASPECT_BASE_SIZE = 768;
+
+/** Round to the nearest multiple of 8 — required by most diffusion models. */
+function roundTo8(n: number): number {
+  return Math.max(8, Math.round(n / 8) * 8);
+}
+
+/**
+ * Derive concrete width/height for an aspect ratio id. Returns null for
+ * "auto" (or an unknown id) so callers omit width/height and let the
+ * generator use its own default.
+ */
+export function resolutionForAspect(
+  aspectId: string,
+): { width: number; height: number } | null {
+  const aspect = ASPECT_RATIOS.find((a) => a.id === aspectId);
+  if (!aspect?.ratio) return null;
+  if (aspect.ratio >= 1) {
+    return {
+      width: roundTo8(ASPECT_BASE_SIZE),
+      height: roundTo8(ASPECT_BASE_SIZE / aspect.ratio),
+    };
+  }
+  return {
+    width: roundTo8(ASPECT_BASE_SIZE * aspect.ratio),
+    height: roundTo8(ASPECT_BASE_SIZE),
+  };
+}
+
+/** Back-compat: map an old stored "WxH" resolution string to the closest
+ * aspect ratio id, so existing saved preferences keep working. */
+export function aspectFromLegacyResolution(resolution: string | undefined): string {
+  if (!resolution) return DEFAULT_ASPECT_RATIO;
+  const [w, h] = resolution.split("x").map(Number);
+  if (!w || !h) return DEFAULT_ASPECT_RATIO;
+  const target = w / h;
+  let best = ASPECT_RATIOS[0];
+  let bestDiff = Infinity;
+  for (const a of ASPECT_RATIOS) {
+    if (!a.ratio) continue;
+    const diff = Math.abs(a.ratio - target);
+    if (diff < bestDiff) {
+      bestDiff = diff;
+      best = a;
+    }
+  }
+  return best.id;
+}
 
 export const DURATIONS = [
   { value: "2", label: "2 seconds" },
@@ -75,12 +144,12 @@ export const STYLE_PRESETS: StylePreset[] = [
 
 export interface GenerationDefaults {
   default_model: string;
-  default_resolution: string;
+  default_aspect: string;
   default_duration: string;
 }
 
 export const DEFAULT_GENERATION: GenerationDefaults = {
   default_model: "ltx-video",
-  default_resolution: "768x512",
+  default_aspect: DEFAULT_ASPECT_RATIO,
   default_duration: "4",
 };

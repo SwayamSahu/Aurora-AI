@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { FolderPlus, Plus } from "lucide-react";
 
 import type { Job } from "@/lib/api/jobs";
-import { STYLE_PRESETS } from "@/lib/generation-options";
+import { resolutionForAspect, STYLE_PRESETS } from "@/lib/generation-options";
 import { useProjects } from "@/lib/query/projects";
 import { useJobs } from "@/lib/query/jobs";
 import { useGeneration } from "@/lib/hooks/use-generation";
@@ -43,20 +43,28 @@ function buildParams(state: ComposerState): Record<string, unknown> {
     .filter(Boolean)
     .join(", ");
   const seed = state.seed ? Number(state.seed) : undefined;
+  // "Auto" resolves to null → omit width/height so the generator uses its
+  // own default (and, once real models are active, its native resolution).
+  const size = resolutionForAspect(state.aspect);
 
   if (state.type === "generate_video") {
-    const [w, h] = state.resolution.split("x").map(Number);
     return {
       prompt,
       negative_prompt: negative || undefined,
       model: state.model,
-      width: w,
-      height: h,
+      width: size?.width,
+      height: size?.height,
       duration_seconds: Number(state.duration),
       seed,
     };
   }
-  return { prompt, negative_prompt: negative || undefined, seed };
+  return {
+    prompt,
+    negative_prompt: negative || undefined,
+    width: size?.width,
+    height: size?.height,
+    seed,
+  };
 }
 
 function StudioInner() {
@@ -195,6 +203,7 @@ function StudioInner() {
             progressEvent={generation.progress}
             busy={generation.busy}
             projectId={projectId}
+            aspect={state.aspect}
           />
           <div className="space-y-3">
             <h2 className="text-sm font-semibold">History</h2>
