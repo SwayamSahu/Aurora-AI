@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { ArrowRight, ChevronDown, Coins, ShoppingCart } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,9 +10,11 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/auth/auth-provider";
 import { useAddToCart, useCheckout } from "@/lib/marketplace/queries";
 import type { ListingDetail } from "@/lib/marketplace/types";
+import { Button } from "@/components/ui/button";
 
 export function ActionBar({ piece, pulse }: { piece: ListingDetail; pulse?: boolean }) {
   const [showDetails, setShowDetails] = React.useState(false);
+  const [added, setAdded] = React.useState(false);
   const router = useRouter();
   const { user, status } = useAuth();
   const addToCart = useAddToCart();
@@ -21,11 +24,27 @@ export function ActionBar({ piece, pulse }: { piece: ListingDetail; pulse?: bool
   const isOwnListing = user?.id === piece.seller.id;
   const busy = addToCart.isPending || checkout.isPending;
 
-  async function buyNow() {
+  function requireAuth() {
     if (status !== "authenticated") {
       router.push("/login");
-      return;
+      return false;
     }
+    return true;
+  }
+
+  async function addOnly() {
+    if (!requireAuth()) return;
+    try {
+      await addToCart.mutateAsync(piece.id);
+      setAdded(true);
+      toast.success("Added to cart.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Couldn't add to cart.");
+    }
+  }
+
+  async function buyNow() {
+    if (!requireAuth()) return;
     try {
       await addToCart.mutateAsync(piece.id);
       const order = await checkout.mutateAsync();
@@ -43,25 +62,44 @@ export function ActionBar({ piece, pulse }: { piece: ListingDetail; pulse?: bool
             This is your listing
           </span>
         ) : (
-          <button
-            type="button"
-            disabled={sold || busy}
-            onClick={buyNow}
-            className={cn(
-              "group inline-flex h-12 items-center gap-2 rounded-full px-6 text-[14px] font-bold uppercase tracking-[1px] text-black transition-transform hover:scale-[1.02]",
-              pulse && "[animation:mk-pulse_1.4s_ease-out_1]",
-              (sold || busy) && "pointer-events-none opacity-50",
-            )}
-            style={{ background: "var(--mk-grad-make-yours)" }}
-          >
-            <ShoppingCart className="size-4" />
-            {sold
-              ? "Sold out"
-              : busy
-                ? "Purchasing…"
-                : `Buy now — ${piece.price_credits} credits`}
-            <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
-          </button>
+          <>
+            <button
+              type="button"
+              disabled={sold || busy}
+              onClick={buyNow}
+              className={cn(
+                "group inline-flex h-12 items-center gap-2 rounded-full px-6 text-[14px] font-bold uppercase tracking-[1px] text-black transition-transform hover:scale-[1.02]",
+                pulse && "[animation:mk-pulse_1.4s_ease-out_1]",
+                (sold || busy) && "pointer-events-none opacity-50",
+              )}
+              style={{ background: "var(--mk-grad-make-yours)" }}
+            >
+              <ShoppingCart className="size-4" />
+              {sold
+                ? "Sold out"
+                : busy
+                  ? "Purchasing…"
+                  : `Buy now — ${piece.price_credits} credits`}
+              <ArrowRight className="size-4 transition-transform group-hover:translate-x-0.5" />
+            </button>
+
+            {!sold ? (
+              added ? (
+                <Button variant="outline" size="lg" asChild>
+                  <Link href="/explore/cart">View cart</Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="lg"
+                  disabled={busy}
+                  onClick={addOnly}
+                >
+                  Add to cart
+                </Button>
+              )
+            ) : null}
+          </>
         )}
       </div>
 

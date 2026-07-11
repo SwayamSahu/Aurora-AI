@@ -79,12 +79,36 @@ export interface WalletRead {
   active_plan_id: string | null;
 }
 
+export interface CreditTransactionRead {
+  id: string;
+  type: string;
+  amount: number;
+  balance_after: number;
+  note: string | null;
+  created_at: string;
+}
+
+export interface WalletHistoryResponse {
+  items: CreditTransactionRead[];
+  total: number;
+  next_offset: number | null;
+}
+
 export interface CreditPlanRead {
   id: string;
   name: string;
   price_cents: number;
   credits_granted: number;
   listing_quota: number;
+}
+
+export interface PlanPurchaseRead {
+  id: string;
+  plan_id: string;
+  status: string;
+  price_cents: number;
+  credits_granted: number;
+  created_at: string;
 }
 
 export interface SellableAsset {

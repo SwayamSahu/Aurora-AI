@@ -104,8 +104,8 @@ export function useDeleteListing() {
 // --------------------------------------------------------------------------- #
 // Cart + checkout + orders
 // --------------------------------------------------------------------------- #
-export function useCart() {
-  return useQuery({ queryKey: ["mk-cart"], queryFn: getCart });
+export function useCart(enabled = true) {
+  return useQuery({ queryKey: ["mk-cart"], queryFn: getCart, enabled });
 }
 
 export function useAddToCart() {
@@ -153,8 +153,8 @@ export function useMySales() {
 // --------------------------------------------------------------------------- #
 // Wallet + plans
 // --------------------------------------------------------------------------- #
-export function useWallet() {
-  return useQuery({ queryKey: ["mk-wallet"], queryFn: getWallet });
+export function useWallet(enabled = true) {
+  return useQuery({ queryKey: ["mk-wallet"], queryFn: getWallet, enabled });
 }
 
 export function useWalletTransactions(limit = 24, offset = 0) {

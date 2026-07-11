@@ -40,7 +40,7 @@ export function PieceCard({
 
   return (
     <Link
-      href={`/explore/${piece.id}`}
+      href={`/explore/p/${piece.id}`}
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       className="group mb-4 block break-inside-avoid focus-visible:outline-none motion-safe:[animation:mk-rise_0.5s_cubic-bezier(0.16,1,0.3,1)_both]"

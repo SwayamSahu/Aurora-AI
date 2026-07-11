@@ -8,8 +8,10 @@ import type {
   ListingListResponse,
   MarketplaceListing,
   OrderRead,
+  PlanPurchaseRead,
   SaleRead,
   SellableAsset,
+  WalletHistoryResponse,
   WalletRead,
 } from "@/lib/marketplace/types";
 
@@ -169,7 +171,9 @@ export function getWallet() {
 }
 
 export function getWalletTransactions(limit = 24, offset = 0) {
-  return apiFetch(`/marketplace/wallet/transactions?limit=${limit}&offset=${offset}`);
+  return apiFetch<WalletHistoryResponse>(
+    `/marketplace/wallet/transactions?limit=${limit}&offset=${offset}`,
+  );
 }
 
 export function listPlans() {
@@ -177,5 +181,7 @@ export function listPlans() {
 }
 
 export function purchasePlan(planId: string) {
-  return apiFetch(`/marketplace/plans/${planId}/purchase`, { method: "POST" });
+  return apiFetch<PlanPurchaseRead>(`/marketplace/plans/${planId}/purchase`, {
+    method: "POST",
+  });
 }
