@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 import type { ListingDetail } from "@/lib/marketplace/types";
 import { formatCount, formatDuration } from "@/lib/marketplace/format";
 import { LikeButton } from "@/components/marketplace/like-button";
+import { ReportButton } from "@/components/shared/report-button";
 
 export function PieceMeta({ piece }: { piece: ListingDetail }) {
   const kind = piece.kind === "video" ? "VIDEO" : "STILL";
@@ -80,6 +81,11 @@ export function PieceMeta({ piece }: { piece: ListingDetail }) {
         >
           <Share2 className="size-4" /> Share
         </button>
+        <ReportButton
+          targetType="listing"
+          targetId={piece.id}
+          className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+        />
       </div>
     </div>
   );

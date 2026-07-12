@@ -6,16 +6,19 @@ import {
   adminAdjustWallet,
   adminDelistListing,
   adminRefundOrder,
+  bulkDelistListings,
   checkout,
   createAdminPlan,
   createListing,
   deleteListing,
   deleteListingComment,
   getAdminListingComments,
+  getAdminOrder,
   getCart,
   getCategoryCounts,
   getListing,
   getListingComments,
+  getPlatformFee,
   getSimilar,
   getMyListings,
   getMyOrders,
@@ -33,6 +36,7 @@ import {
   toggleListingLike,
   updateAdminPlan,
   updateListing,
+  updatePlatformFee,
   type ListingInput,
   type ListingUpdateInput,
 } from "@/lib/marketplace/api";
@@ -285,6 +289,17 @@ export function useAdminDelistListing() {
   });
 }
 
+export function useBulkDelistListings() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => bulkDelistListings(ids),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["mk-admin-listings"] });
+      qc.invalidateQueries({ queryKey: ["mk-listings"] });
+    },
+  });
+}
+
 export function useAdminAdjustWallet() {
   return useMutation({
     mutationFn: ({
@@ -301,7 +316,38 @@ export function useAdminAdjustWallet() {
 
 export function useAdminRefundOrder() {
   return useMutation({
-    mutationFn: (orderId: string) => adminRefundOrder(orderId),
+    mutationFn: ({
+      orderId,
+      reason,
+      itemIds,
+    }: {
+      orderId: string;
+      reason: string;
+      itemIds?: string[];
+    }) => adminRefundOrder(orderId, { reason, item_ids: itemIds }),
+  });
+}
+
+export function useAdminOrder(orderId: string, enabled: boolean) {
+  return useQuery({
+    queryKey: ["mk-admin-order", orderId],
+    queryFn: () => getAdminOrder(orderId),
+    enabled: enabled && !!orderId,
+  });
+}
+
+export function usePlatformFee() {
+  return useQuery({
+    queryKey: ["mk-platform-fee"],
+    queryFn: getPlatformFee,
+  });
+}
+
+export function useUpdatePlatformFee() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (fee: number) => updatePlatformFee(fee),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["mk-platform-fee"] }),
   });
 }
 

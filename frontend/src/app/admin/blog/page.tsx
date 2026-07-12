@@ -11,6 +11,7 @@ import {
   useAdminDeleteComment,
   useAdminPostComments,
   useAdminPosts,
+  useBulkDeletePosts,
   useDeletePost,
   useModerateComment,
 } from "@/lib/blog/queries";
@@ -125,6 +126,8 @@ export default function AdminBlogPage() {
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [q, setQ] = React.useState("");
   const [openComments, setOpenComments] = React.useState<string | null>(null);
+  const [selected, setSelected] = React.useState<Set<string>>(new Set());
+  const bulkDelete = useBulkDeletePosts();
 
   const {
     data,
@@ -138,6 +141,35 @@ export default function AdminBlogPage() {
   });
   const posts = data?.pages.flatMap((page) => page.items) ?? [];
   const total = data?.pages[0]?.total ?? 0;
+
+  function toggle(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    setSelected((prev) =>
+      prev.size === posts.length ? new Set() : new Set(posts.map((p) => p.id)),
+    );
+  }
+
+  async function bulkDeleteSelected() {
+    const ids = Array.from(selected);
+    try {
+      const res = await bulkDelete.mutateAsync(ids);
+      toast.success(`Deleted ${res.succeeded.length} post(s).`);
+      if (res.failed.length > 0) {
+        toast.error(`${res.failed.length} could not be found.`);
+      }
+      setSelected(new Set());
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Bulk delete failed.");
+    }
+  }
 
   if (status === "loading") {
     return (
@@ -181,6 +213,34 @@ export default function AdminBlogPage() {
         />
       </div>
 
+      {posts.length > 0 ? (
+        <div className="mb-3 flex items-center gap-3 text-sm">
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={selected.size === posts.length}
+              onChange={toggleAll}
+            />
+            Select all
+          </label>
+          {selected.size > 0 ? (
+            <>
+              <span className="text-muted-foreground">
+                {selected.size} selected
+              </span>
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={bulkDeleteSelected}
+                loading={bulkDelete.isPending}
+              >
+                <Trash2 className="size-3.5" /> Delete selected
+              </Button>
+            </>
+          ) : null}
+        </div>
+      ) : null}
+
       {isLoading ? (
         <Skeleton className="h-40 w-full" />
       ) : (
@@ -191,12 +251,20 @@ export default function AdminBlogPage() {
               className="rounded-xl border border-[var(--mk-border)] bg-[var(--mk-surface-1)] p-4"
             >
               <div className="flex items-center justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">{post.title}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {post.status} · {post.author.full_name ?? "Anonymous"} ·{" "}
-                    {post.comment_count} comments · {post.like_count} likes
-                  </p>
+                <div className="flex min-w-0 flex-1 items-start gap-3">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={selected.has(post.id)}
+                    onChange={() => toggle(post.id)}
+                  />
+                  <div className="min-w-0">
+                    <p className="font-semibold">{post.title}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {post.status} · {post.author.full_name ?? "Anonymous"} ·{" "}
+                      {post.comment_count} comments · {post.like_count} likes
+                    </p>
+                  </div>
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">

@@ -12,10 +12,10 @@ writes at the whole-database level.
 
 from __future__ import annotations
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from app.db.models import CreditTransaction, TransactionType, Wallet
+from app.db.models import CreditTransaction, TransactionType, User, Wallet
 from app.services.marketplace_errors import InsufficientCreditsError
 
 # New users can list one item for free before buying a plan — keeps the
@@ -130,3 +130,44 @@ def list_transactions(
         )
     )
     return items, total
+
+
+def search_transactions(
+    db: Session,
+    *,
+    q: str | None = None,
+    tx_type: TransactionType | None = None,
+    user_id: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+) -> tuple[list[tuple[CreditTransaction, User]], int]:
+    """Admin-only global ledger search across every wallet. Returns each
+    transaction paired with its owning user, since the ledger itself has no
+    direct user reference (only `wallet_id`)."""
+
+    def _build(stmt):
+        stmt = stmt.join(Wallet, Wallet.id == CreditTransaction.wallet_id).join(
+            User, User.id == Wallet.user_id
+        )
+        if q:
+            like = f"%{q.lower()}%"
+            stmt = stmt.where(
+                or_(
+                    func.lower(User.email).like(like),
+                    func.lower(User.full_name).like(like),
+                )
+            )
+        if tx_type is not None:
+            stmt = stmt.where(CreditTransaction.type == tx_type)
+        if user_id:
+            stmt = stmt.where(Wallet.user_id == user_id)
+        return stmt
+
+    total = db.scalar(
+        select(func.count()).select_from(_build(select(CreditTransaction.id)).subquery())
+    ) or 0
+
+    stmt = _build(select(CreditTransaction, User))
+    stmt = stmt.order_by(CreditTransaction.created_at.desc()).limit(limit).offset(offset)
+
+    return list(db.execute(stmt).all()), total

@@ -10,6 +10,7 @@ import {
   useDeleteComment,
 } from "@/lib/blog/queries";
 import { Button } from "@/components/ui/button";
+import { ReportButton } from "@/components/shared/report-button";
 
 export function PostComments({
   slug,
@@ -80,7 +81,14 @@ export function PostComments({
               >
                 <Trash2 className="size-4" />
               </button>
-            ) : null}
+            ) : (
+              <ReportButton
+                targetType="blog_comment"
+                targetId={c.id}
+                label=""
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              />
+            )}
           </li>
         ))}
         {comments.length === 0 ? (

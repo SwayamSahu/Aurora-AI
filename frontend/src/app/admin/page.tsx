@@ -1,7 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, ScrollText, ShoppingBag, Users } from "lucide-react";
+import {
+  Flag,
+  FileText,
+  Receipt,
+  ScrollText,
+  ShoppingBag,
+  TrendingUp,
+  Users,
+} from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { isAdmin, isModerator } from "@/lib/admin/access";
@@ -25,11 +33,33 @@ const SECTIONS = [
     adminOnly: false,
   },
   {
+    href: "/admin/reports",
+    icon: Flag,
+    title: "Reports",
+    description: "User-flagged posts, comments, and listings awaiting review.",
+    adminOnly: false,
+  },
+  {
     href: "/admin/users",
     icon: Users,
     title: "User Management",
     description:
       "Search accounts, view aggregated activity, change roles, and suspend/reactivate.",
+    adminOnly: true,
+  },
+  {
+    href: "/admin/ledger",
+    icon: Receipt,
+    title: "Credit Ledger",
+    description: "Search every wallet's transaction history in one place.",
+    adminOnly: true,
+  },
+  {
+    href: "/admin/revenue",
+    icon: TrendingUp,
+    title: "Revenue",
+    description:
+      "Platform revenue, GMV, refunds, and marketplace activity over time.",
     adminOnly: true,
   },
   {

@@ -199,3 +199,22 @@ export function moderateComment(
     json: input,
   });
 }
+
+export interface BulkActionResult {
+  succeeded: string[];
+  failed: string[];
+}
+
+export function bulkDeletePosts(ids: string[]) {
+  return apiFetch<BulkActionResult>("/admin/blog/posts/bulk-delete", {
+    method: "POST",
+    json: { ids },
+  });
+}
+
+export function bulkHideComments(ids: string[]) {
+  return apiFetch<BulkActionResult>("/admin/blog/comments/bulk-hide", {
+    method: "POST",
+    json: { ids },
+  });
+}

@@ -29,8 +29,10 @@ class OrderItemRead(BaseModel):
 
     id: str
     listing_id: str | None
+    seller_id: str
     title: str
     price_credits: int
+    is_refunded: bool
     cloned_asset_id: str | None
 
 

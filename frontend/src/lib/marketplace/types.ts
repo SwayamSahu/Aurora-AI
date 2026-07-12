@@ -70,8 +70,10 @@ export interface CartRead {
 export interface OrderItemRead {
   id: string;
   listing_id: string | null;
+  seller_id: string;
   title: string;
   price_credits: number;
+  is_refunded: boolean;
   cloned_asset_id: string | null;
 }
 

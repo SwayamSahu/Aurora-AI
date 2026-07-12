@@ -289,7 +289,9 @@ def test_admin_can_refund_a_completed_order(client: TestClient, db_session):
     _make_admin(db_session, "admin8@example.com")
 
     refunded = client.post(
-        f"/api/v1/admin/marketplace/orders/{order['id']}/refund", headers=h_admin
+        f"/api/v1/admin/marketplace/orders/{order['id']}/refund",
+        json={"reason": "buyer request"},
+        headers=h_admin,
     )
     assert refunded.status_code == 200
     assert refunded.json()["status"] == "refunded"
@@ -325,10 +327,14 @@ def test_refunding_twice_fails_cleanly(client: TestClient, db_session):
     _make_admin(db_session, "admin9@example.com")
 
     client.post(
-        f"/api/v1/admin/marketplace/orders/{order['id']}/refund", headers=h_admin
+        f"/api/v1/admin/marketplace/orders/{order['id']}/refund",
+        json={"reason": "buyer request"},
+        headers=h_admin,
     )
     second = client.post(
-        f"/api/v1/admin/marketplace/orders/{order['id']}/refund", headers=h_admin
+        f"/api/v1/admin/marketplace/orders/{order['id']}/refund",
+        json={"reason": "buyer request"},
+        headers=h_admin,
     )
     assert second.status_code == 409
 
@@ -368,7 +374,9 @@ def test_refund_reclaim_never_drives_seller_wallet_negative(
     )
 
     refunded = client.post(
-        f"/api/v1/admin/marketplace/orders/{order['id']}/refund", headers=h_admin
+        f"/api/v1/admin/marketplace/orders/{order['id']}/refund",
+        json={"reason": "seller spent it already"},
+        headers=h_admin,
     )
     assert refunded.status_code == 200
     # Seller wallet stays at 0 (nothing left to reclaim) instead of erroring.

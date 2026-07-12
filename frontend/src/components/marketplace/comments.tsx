@@ -11,6 +11,7 @@ import {
 } from "@/lib/marketplace/queries";
 import type { ListingDetail } from "@/lib/marketplace/types";
 import { Button } from "@/components/ui/button";
+import { ReportButton } from "@/components/shared/report-button";
 
 export function Comments({ piece }: { piece: ListingDetail }) {
   const { user, status } = useAuth();
@@ -78,7 +79,14 @@ export function Comments({ piece }: { piece: ListingDetail }) {
               >
                 <Trash2 className="size-4" />
               </button>
-            ) : null}
+            ) : (
+              <ReportButton
+                targetType="listing_comment"
+                targetId={c.id}
+                label=""
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              />
+            )}
           </li>
         ))}
         {comments.length === 0 ? (

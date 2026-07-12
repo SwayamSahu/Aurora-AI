@@ -6,8 +6,11 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     admin,
+    admin_analytics,
     admin_audit,
     admin_blog,
+    admin_ledger,
+    admin_reports,
     admin_users,
     assets,
     audio,
@@ -22,6 +25,7 @@ from app.api.routes import (
     listings,
     marketplace,
     projects,
+    reports,
     timeline,
     users,
     ws,
@@ -40,9 +44,13 @@ api_router.include_router(blog.router)
 api_router.include_router(marketplace.router)
 api_router.include_router(listings.router)
 api_router.include_router(commerce.router)
+api_router.include_router(reports.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_blog.router)
 api_router.include_router(admin_users.router)
+api_router.include_router(admin_ledger.router)
+api_router.include_router(admin_analytics.router)
+api_router.include_router(admin_reports.router)
 api_router.include_router(admin_audit.router)
 api_router.include_router(timeline.router)
 api_router.include_router(audio.router)

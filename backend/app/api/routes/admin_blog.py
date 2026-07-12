@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Query
 
 from app.api.deps import DbSession, ModeratorUser
 from app.db.models import BlogComment, BlogStatus
+from app.schemas.admin import BulkActionResult, BulkIdsRequest
 from app.schemas.blog import (
     BlogCommentAdminUpdate,
     BlogCommentRead,
@@ -86,3 +87,55 @@ def moderate_comment(
         metadata=data.model_dump(exclude_none=True),
     )
     return BlogCommentRead.model_validate(comment)
+
+
+@router.post("/posts/bulk-delete", response_model=BulkActionResult)
+def bulk_delete_posts(
+    data: BulkIdsRequest, moderator: ModeratorUser, db: DbSession
+) -> BulkActionResult:
+    succeeded: list[str] = []
+    failed: list[str] = []
+    for post_id in data.ids:
+        post = blog_service.get_by_id(db, post_id)
+        if post is None:
+            failed.append(post_id)
+            continue
+        blog_service.delete_post(db, post)
+        succeeded.append(post_id)
+
+    if succeeded:
+        audit_service.record(
+            db,
+            actor_id=moderator.id,
+            action="post.bulk_delete",
+            target_type="blog_post",
+            target_id=None,
+            metadata={"ids": succeeded, "count": len(succeeded)},
+        )
+    return BulkActionResult(succeeded=succeeded, failed=failed)
+
+
+@router.post("/comments/bulk-hide", response_model=BulkActionResult)
+def bulk_hide_comments(
+    data: BulkIdsRequest, moderator: ModeratorUser, db: DbSession
+) -> BulkActionResult:
+    succeeded: list[str] = []
+    failed: list[str] = []
+    for comment_id in data.ids:
+        comment = blog_service.get_comment(db, comment_id)
+        if comment is None:
+            failed.append(comment_id)
+            continue
+        blog_service.set_comment_hidden(db, comment, True)
+        succeeded.append(comment_id)
+
+    if succeeded:
+        audit_service.record(
+            db,
+            actor_id=moderator.id,
+            action="blog_comment.bulk_hide",
+            target_type="blog_comment",
+            target_id=None,
+            metadata={"ids": succeeded, "count": len(succeeded)},
+        )
+    return BulkActionResult(succeeded=succeeded, failed=failed)

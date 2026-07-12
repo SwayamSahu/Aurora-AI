@@ -8,6 +8,7 @@ import { categoryLabel } from "@/lib/blog/content";
 import { absoluteMediaUrl, type BlogPostDetail } from "@/lib/blog/api";
 import { useAuth } from "@/components/auth/auth-provider";
 import { LikeButton } from "@/components/blog/like-button";
+import { ReportButton } from "@/components/shared/report-button";
 
 interface TocItem {
   id: string;
@@ -88,6 +89,7 @@ export function PostView({
             <Clock className="size-3.5" /> {post.read_minutes} min read
           </span>
           <LikeButton post={post} slug={slug} />
+          <ReportButton targetType="blog_post" targetId={post.id} />
           {isAuthor ? (
             <Link
               href={`/blog/${slug}/edit`}

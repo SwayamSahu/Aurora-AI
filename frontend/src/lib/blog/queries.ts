@@ -7,6 +7,8 @@ import {
 
 import {
   addComment,
+  bulkDeletePosts,
+  bulkHideComments,
   createPost,
   deleteComment,
   deletePost,
@@ -146,6 +148,27 @@ export function useAdminPosts(params: {
       listAllPostsAdmin({ ...params, limit: PAGE_SIZE, offset: pageParam }),
     initialPageParam: 0,
     getNextPageParam: (last) => last.next_offset,
+  });
+}
+
+export function useBulkDeletePosts() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => bulkDeletePosts(ids),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blog-admin-posts"] });
+      qc.invalidateQueries({ queryKey: ["blog-posts"] });
+    },
+  });
+}
+
+export function useBulkHideComments() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => bulkHideComments(ids),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blog-admin-comments"] });
+    },
   });
 }
 

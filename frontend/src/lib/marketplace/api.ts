@@ -253,6 +253,18 @@ export function adminDelistListing(id: string) {
   });
 }
 
+export interface BulkActionResult {
+  succeeded: string[];
+  failed: string[];
+}
+
+export function bulkDelistListings(ids: string[]) {
+  return apiFetch<BulkActionResult>("/admin/marketplace/listings/bulk-delist", {
+    method: "POST",
+    json: { ids },
+  });
+}
+
 export function adminAdjustWallet(userId: string, amount: number, note: string) {
   return apiFetch<{ balance_credits: number }>(
     `/admin/marketplace/wallets/${userId}/adjust`,
@@ -260,9 +272,28 @@ export function adminAdjustWallet(userId: string, amount: number, note: string) 
   );
 }
 
-export function adminRefundOrder(orderId: string) {
+export function adminRefundOrder(
+  orderId: string,
+  input: { reason: string; item_ids?: string[] },
+) {
   return apiFetch<OrderRead>(`/admin/marketplace/orders/${orderId}/refund`, {
     method: "POST",
+    json: input,
+  });
+}
+
+export function getAdminOrder(orderId: string) {
+  return apiFetch<OrderRead>(`/admin/marketplace/orders/${orderId}`);
+}
+
+export function getPlatformFee() {
+  return apiFetch<{ platform_fee: number }>("/admin/marketplace/settings/fee");
+}
+
+export function updatePlatformFee(platform_fee: number) {
+  return apiFetch<{ platform_fee: number }>("/admin/marketplace/settings/fee", {
+    method: "PATCH",
+    json: { platform_fee },
   });
 }
 

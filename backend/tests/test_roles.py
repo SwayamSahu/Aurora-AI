@@ -154,7 +154,9 @@ def test_moderator_cannot_touch_finance(client: TestClient, db_session):
     # Refund (admin-only).
     assert (
         client.post(
-            "/api/v1/admin/marketplace/orders/some-order/refund", headers=h_mod
+            "/api/v1/admin/marketplace/orders/some-order/refund",
+            json={"reason": "nope"},
+            headers=h_mod,
         ).status_code
         == 403
     )

@@ -18,6 +18,11 @@ from app.schemas.admin import (
     AdminPlanCreate,
     AdminPlanRead,
     AdminPlanUpdate,
+    BulkActionResult,
+    BulkIdsRequest,
+    PlatformFeeRead,
+    PlatformFeeUpdate,
+    RefundRequest,
     WalletAdjustRequest,
 )
 from app.schemas.commerce import OrderRead
@@ -33,6 +38,7 @@ from app.services import (
     listing_service,
     order_service,
     plan_service,
+    platform_settings_service,
     wallet_service,
 )
 from app.services.marketplace_errors import MarketplaceError
@@ -165,6 +171,58 @@ def moderate_listing_comment(
     return ListingCommentRead.model_validate(comment)
 
 
+@router.post("/listings/bulk-delist", response_model=BulkActionResult)
+def bulk_delist_listings(
+    data: BulkIdsRequest, moderator: ModeratorUser, db: DbSession
+) -> BulkActionResult:
+    succeeded: list[str] = []
+    failed: list[str] = []
+    for listing_id in data.ids:
+        listing = listing_service.get_by_id(db, listing_id)
+        if listing is None:
+            failed.append(listing_id)
+            continue
+        listing_service.admin_delist(db, listing)
+        succeeded.append(listing_id)
+
+    if succeeded:
+        audit_service.record(
+            db,
+            actor_id=moderator.id,
+            action="listing.bulk_delist",
+            target_type="listing",
+            target_id=None,
+            metadata={"ids": succeeded, "count": len(succeeded)},
+        )
+    return BulkActionResult(succeeded=succeeded, failed=failed)
+
+
+@router.post("/comments/bulk-hide", response_model=BulkActionResult)
+def bulk_hide_listing_comments(
+    data: BulkIdsRequest, moderator: ModeratorUser, db: DbSession
+) -> BulkActionResult:
+    succeeded: list[str] = []
+    failed: list[str] = []
+    for comment_id in data.ids:
+        comment = listing_service.get_comment(db, comment_id)
+        if comment is None:
+            failed.append(comment_id)
+            continue
+        listing_service.set_comment_hidden(db, comment, True)
+        succeeded.append(comment_id)
+
+    if succeeded:
+        audit_service.record(
+            db,
+            actor_id=moderator.id,
+            action="listing_comment.bulk_hide",
+            target_type="listing_comment",
+            target_id=None,
+            metadata={"ids": succeeded, "count": len(succeeded)},
+        )
+    return BulkActionResult(succeeded=succeeded, failed=failed)
+
+
 # --------------------------------------------------------------------------- #
 # Wallet adjustments + refunds
 # --------------------------------------------------------------------------- #
@@ -188,21 +246,61 @@ def adjust_wallet(
     return {"balance_credits": wallet.balance_credits}
 
 
+@router.get("/orders/{order_id}", response_model=OrderRead)
+def get_order(order_id: str, admin: AdminUser, db: DbSession) -> OrderRead:
+    order = order_service.get_for_admin(db, order_id)
+    if order is None:
+        raise HTTPException(status_code=404, detail="Order not found.")
+    return OrderRead.model_validate(order)
+
+
 @router.post("/orders/{order_id}/refund", response_model=OrderRead)
-def refund_order(order_id: str, admin: AdminUser, db: DbSession) -> OrderRead:
+def refund_order(
+    order_id: str, data: RefundRequest, admin: AdminUser, db: DbSession
+) -> OrderRead:
     order = order_service.get_for_admin(db, order_id)
     if order is None:
         raise HTTPException(status_code=404, detail="Order not found.")
     try:
-        order = checkout_service.refund_order(db, order)
+        order = checkout_service.refund_order(
+            db, order, reason=data.reason, item_ids=data.item_ids
+        )
     except MarketplaceError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     audit_service.record(
         db,
         actor_id=admin.id,
-        action="order.refund",
+        action="order.refund" if data.item_ids is None else "order.refund_partial",
         target_type="order",
         target_id=order.id,
-        metadata={"total_credits": order.total_credits},
+        metadata={
+            "reason": data.reason,
+            "item_ids": data.item_ids,
+            "status": order.status.value,
+        },
     )
     return OrderRead.model_validate(order)
+
+
+# --------------------------------------------------------------------------- #
+# Platform settings
+# --------------------------------------------------------------------------- #
+@router.get("/settings/fee", response_model=PlatformFeeRead)
+def get_platform_fee(admin: AdminUser, db: DbSession) -> PlatformFeeRead:
+    return PlatformFeeRead(platform_fee=platform_settings_service.get_platform_fee(db))
+
+
+@router.patch("/settings/fee", response_model=PlatformFeeRead)
+def update_platform_fee(
+    data: PlatformFeeUpdate, admin: AdminUser, db: DbSession
+) -> PlatformFeeRead:
+    fee = platform_settings_service.set_platform_fee(db, data.platform_fee)
+    audit_service.record(
+        db,
+        actor_id=admin.id,
+        action="settings.platform_fee_update",
+        target_type="platform_setting",
+        target_id="marketplace_platform_fee",
+        metadata={"platform_fee": fee},
+    )
+    return PlatformFeeRead(platform_fee=fee)

@@ -13,7 +13,6 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.config import settings
 from app.db.models import (
     Listing,
     ListingStatus,
@@ -22,7 +21,12 @@ from app.db.models import (
     OrderStatus,
     TransactionType,
 )
-from app.services import asset_service, cart_service, wallet_service
+from app.services import (
+    asset_service,
+    cart_service,
+    platform_settings_service,
+    wallet_service,
+)
 from app.services.marketplace_errors import ListingUnavailableError, MarketplaceError
 
 
@@ -69,12 +73,14 @@ def checkout(db: Session, buyer_id: str) -> Order:
     db.add(order)
     db.flush()  # assign order.id for related_order_id / FK use below
 
+    fee_rate = platform_settings_service.get_platform_fee(db)
+
     for listing in to_purchase:
         listing.stock -= 1
         if listing.stock <= 0:
             listing.status = ListingStatus.SOLD
 
-        fee = round(listing.price_credits * settings.marketplace_platform_fee)
+        fee = round(listing.price_credits * fee_rate)
         seller_earning = listing.price_credits - fee
         if seller_earning > 0:
             seller_wallet = wallet_service.get_wallet_locked(db, listing.seller_id)
@@ -96,6 +102,7 @@ def checkout(db: Session, buyer_id: str) -> Order:
                 seller_id=listing.seller_id,
                 title=listing.title,
                 price_credits=listing.price_credits,
+                platform_fee_credits=fee,
                 cloned_asset_id=clone.id,
             )
         )
@@ -107,11 +114,17 @@ def checkout(db: Session, buyer_id: str) -> Order:
     return order
 
 
-def refund_order(db: Session, order: Order) -> Order:
-    """Admin-triggered refund: credits the buyer back in full and reclaims
-    each seller's earning where they still have the balance to cover it (a
-    seller who already spent it isn't driven negative — the platform
-    absorbs that gap, a deliberate v1 simplification).
+def refund_order(
+    db: Session, order: Order, *, reason: str, item_ids: list[str] | None = None
+) -> Order:
+    """Admin-triggered refund, full or partial (`item_ids` selects which
+    order items to refund; omit for all remaining items). Credits the buyer
+    back per-item and reclaims each seller's earning where they still have
+    the balance to cover it (a seller who already spent it isn't driven
+    negative — the platform absorbs that gap, a deliberate v1
+    simplification). Uses each item's `platform_fee_credits`, snapshotted at
+    sale time, so a later platform-fee change never alters what a past sale
+    reclaims.
 
     Does NOT reverse listing/stock state or delete the buyer's cloned asset
     — this is a financial reversal only. Re-listing, if desired, is a
@@ -120,34 +133,51 @@ def refund_order(db: Session, order: Order) -> Order:
     if order.status == OrderStatus.REFUNDED:
         raise MarketplaceError("Order already refunded.")
 
+    if item_ids is not None:
+        wanted = set(item_ids)
+        to_refund = [
+            item for item in order.items if item.id in wanted and not item.is_refunded
+        ]
+        if not to_refund:
+            raise MarketplaceError("No refundable items match the given ids.")
+    else:
+        to_refund = [item for item in order.items if not item.is_refunded]
+        if not to_refund:
+            raise MarketplaceError("Order already refunded.")
+
+    refund_total = sum(item.price_credits for item in to_refund)
+
     buyer_wallet = wallet_service.get_wallet_locked(db, order.buyer_id)
     wallet_service.credit(
         db,
         buyer_wallet,
-        order.total_credits,
+        refund_total,
         TransactionType.REFUND,
-        note="Order refund",
+        note=f"Order refund: {reason}",
         related_order_id=order.id,
     )
 
-    for item in order.items:
-        fee = round(item.price_credits * settings.marketplace_platform_fee)
-        seller_earning = item.price_credits - fee
-        if seller_earning <= 0:
-            continue
-        seller_wallet = wallet_service.get_wallet_locked(db, item.seller_id)
-        reclaim = min(seller_earning, seller_wallet.balance_credits)
-        if reclaim > 0:
-            wallet_service.debit(
-                db,
-                seller_wallet,
-                reclaim,
-                TransactionType.REFUND,
-                note=f"Refund reclaim: {item.title}",
-                related_order_id=order.id,
-            )
+    for item in to_refund:
+        seller_earning = item.price_credits - item.platform_fee_credits
+        if seller_earning > 0:
+            seller_wallet = wallet_service.get_wallet_locked(db, item.seller_id)
+            reclaim = min(seller_earning, seller_wallet.balance_credits)
+            if reclaim > 0:
+                wallet_service.debit(
+                    db,
+                    seller_wallet,
+                    reclaim,
+                    TransactionType.REFUND,
+                    note=f"Refund reclaim: {item.title} ({reason})",
+                    related_order_id=order.id,
+                )
+        item.is_refunded = True
 
-    order.status = OrderStatus.REFUNDED
+    order.status = (
+        OrderStatus.REFUNDED
+        if all(item.is_refunded for item in order.items)
+        else OrderStatus.PARTIALLY_REFUNDED
+    )
     db.commit()
     db.refresh(order)
     return order

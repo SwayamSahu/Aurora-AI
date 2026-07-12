@@ -89,3 +89,68 @@ class AdminUserUpdate(BaseModel):
         if value is not None and value not in ("user", "moderator", "admin"):
             raise ValueError("role must be one of user, moderator, admin.")
         return value
+
+
+class RefundRequest(BaseModel):
+    reason: str = Field(min_length=1, max_length=280)
+    # Omit to refund every remaining (non-refunded) item on the order.
+    item_ids: list[str] | None = None
+
+
+class PlatformFeeRead(BaseModel):
+    platform_fee: float
+
+
+class PlatformFeeUpdate(BaseModel):
+    platform_fee: float = Field(ge=0, le=1)
+
+
+class LedgerEntryUser(BaseModel):
+    id: str
+    email: str
+    full_name: str | None
+
+
+class LedgerEntryRead(BaseModel):
+    id: str
+    wallet_id: str
+    user: LedgerEntryUser
+    type: str
+    amount: int
+    balance_after: int
+    note: str | None
+    related_order_id: str | None
+    created_at: datetime
+
+
+class LedgerSearchResponse(BaseModel):
+    items: list[LedgerEntryRead]
+    total: int
+    next_offset: int | None = None
+
+
+class RevenuePoint(BaseModel):
+    date: str
+    revenue_credits: int
+    gmv_credits: int
+    order_count: int
+
+
+class RevenueSummary(BaseModel):
+    total_revenue_credits: int
+    total_gmv_credits: int
+    total_orders: int
+    total_refunded_credits: int
+    active_sellers: int
+    active_buyers: int
+    current_platform_fee: float
+    daily: list[RevenuePoint]
+
+
+class BulkIdsRequest(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=200)
+
+
+class BulkActionResult(BaseModel):
+    succeeded: list[str]
+    failed: list[str]
