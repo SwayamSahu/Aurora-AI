@@ -17,6 +17,7 @@ from app.schemas.listing import ListingSummary
 from app.services import (
     audit_service,
     blog_service,
+    gdpr_service,
     listing_service,
     order_service,
     user_service,
@@ -62,6 +63,7 @@ def get_user_detail(user_id: str, admin: AdminUser, db: DbSession) -> AdminUserD
         full_name=user.full_name,
         role=user.role.value,
         is_active=user.is_active,
+        erased_at=user.erased_at,
         created_at=user.created_at,
         wallet_balance=wallet.balance_credits,
         listing_quota=wallet.listing_quota,
@@ -135,4 +137,36 @@ def update_user(
             metadata={"is_active": data.is_active},
         )
 
+    return get_user_detail(user_id, admin, db)
+
+
+@router.post("/{user_id}/erase", response_model=AdminUserDetail)
+def erase_user(user_id: str, admin: AdminUser, db: DbSession) -> AdminUserDetail:
+    """Admin-triggered GDPR erasure — for support-submitted deletion
+    requests. Self-erasure goes through `POST /users/me/erase` instead."""
+    user = user_service.get_by_id(db, user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found.")
+    if user.id == admin.id:
+        raise HTTPException(
+            status_code=400, detail="Use account settings to erase your own account."
+        )
+    if (
+        user.role == UserRole.ADMIN
+        and user.is_active
+        and user_service.count_active_admins(db) <= 1
+    ):
+        raise HTTPException(
+            status_code=400, detail="Can't erase the last remaining active admin."
+        )
+
+    gdpr_service.anonymize_user(db, user)
+    audit_service.record(
+        db,
+        actor_id=admin.id,
+        action="user.erase",
+        target_type="user",
+        target_id=user.id,
+        metadata={},
+    )
     return get_user_detail(user_id, admin, db)

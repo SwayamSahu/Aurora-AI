@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { MessageSquare, Coins, Share2 } from "lucide-react";
 
 import { cn } from "@/lib/utils";
@@ -86,6 +87,12 @@ export function PieceMeta({ piece }: { piece: ListingDetail }) {
           targetId={piece.id}
           className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
         />
+        <Link
+          href={`/dmca?target_type=listing&target_id=${piece.id}`}
+          className="transition-colors hover:text-foreground"
+        >
+          Report copyright
+        </Link>
       </div>
     </div>
   );

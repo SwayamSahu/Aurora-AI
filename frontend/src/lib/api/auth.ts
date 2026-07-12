@@ -71,3 +71,14 @@ export function changePassword(currentPassword: string, newPassword: string) {
     json: { current_password: currentPassword, new_password: newPassword },
   });
 }
+
+export function exportMyData() {
+  return apiFetch<Record<string, unknown>>("/users/me/export");
+}
+
+export function eraseMyAccount(password: string) {
+  return apiFetch<void>("/users/me/erase", {
+    method: "POST",
+    json: { password },
+  });
+}

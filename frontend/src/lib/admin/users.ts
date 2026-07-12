@@ -10,6 +10,7 @@ export interface AdminUserRead {
   full_name: string | null;
   role: AdminRole;
   is_active: boolean;
+  erased_at: string | null;
   created_at: string;
 }
 
@@ -57,5 +58,11 @@ export function updateAdminUser(
   return apiFetch<AdminUserDetail>(`/admin/users/${userId}`, {
     method: "PATCH",
     json: input,
+  });
+}
+
+export function eraseAdminUser(userId: string) {
+  return apiFetch<AdminUserDetail>(`/admin/users/${userId}/erase`, {
+    method: "POST",
   });
 }

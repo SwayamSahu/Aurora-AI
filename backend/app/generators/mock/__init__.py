@@ -5,6 +5,7 @@ tested on the Mac with NO GPU. They emit genuine, valid media files so that
 downstream FFmpeg/MoviePy processing is exercised for real.
 """
 
+from app.generators.mock.content_safety import MockContentSafetyClassifier
 from app.generators.mock.detector import MockObjectDetector
 from app.generators.mock.editor import MockVideoEditor
 from app.generators.mock.generators import (
@@ -25,4 +26,5 @@ __all__ = [
     "MockTranscriber",
     "MockVideoEditor",
     "MockObjectDetector",
+    "MockContentSafetyClassifier",
 ]

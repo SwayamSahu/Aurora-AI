@@ -59,6 +59,7 @@ class AdminUserRead(BaseModel):
     full_name: str | None
     role: str
     is_active: bool
+    erased_at: datetime | None = None
     created_at: datetime
 
 

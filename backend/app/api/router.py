@@ -9,8 +9,10 @@ from app.api.routes import (
     admin_analytics,
     admin_audit,
     admin_blog,
+    admin_dmca,
     admin_ledger,
     admin_reports,
+    admin_system,
     admin_users,
     assets,
     audio,
@@ -18,6 +20,7 @@ from app.api.routes import (
     blog,
     commerce,
     detect,
+    dmca,
     edits,
     export,
     health,
@@ -45,12 +48,15 @@ api_router.include_router(marketplace.router)
 api_router.include_router(listings.router)
 api_router.include_router(commerce.router)
 api_router.include_router(reports.router)
+api_router.include_router(dmca.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_blog.router)
 api_router.include_router(admin_users.router)
 api_router.include_router(admin_ledger.router)
 api_router.include_router(admin_analytics.router)
 api_router.include_router(admin_reports.router)
+api_router.include_router(admin_dmca.router)
+api_router.include_router(admin_system.router)
 api_router.include_router(admin_audit.router)
 api_router.include_router(timeline.router)
 api_router.include_router(audio.router)

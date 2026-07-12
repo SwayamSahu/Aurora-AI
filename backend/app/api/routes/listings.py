@@ -23,7 +23,13 @@ from app.schemas.listing import (
     ListingUpdate,
     SellableAssetRead,
 )
-from app.services import asset_service, audit_service, listing_service, order_service
+from app.services import (
+    asset_service,
+    audit_service,
+    content_safety_service,
+    listing_service,
+    order_service,
+)
 from app.services.marketplace_errors import MarketplaceError, RateLimitedError
 from app.storage import get_storage
 
@@ -234,6 +240,9 @@ async def upload_listing_media(
     key = f"marketplace/{current_user.id}/{uuid.uuid4()}-{file.filename or 'upload'}"
     get_storage().put(key, data, content_type)
     media = listing_service.create_media(db, current_user.id, key, content_type)
+    content_safety_service.scan_and_flag(
+        db, media, image_bytes=data, target_type="listing_media"
+    )
     return ListingMediaRead(id=media.id, url=listing_service.media_url(media.id))
 
 

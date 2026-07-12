@@ -277,6 +277,27 @@ class Transcriber(Generator):
     ) -> TranscriptionResult: ...
 
 
+# --------------------------------------------------------------------------- #
+# Content safety (automated NSFW/violence screening on upload)
+# --------------------------------------------------------------------------- #
+@dataclass
+class ContentSafetyResult:
+    flagged: bool
+    categories: list[str] = field(default_factory=list)
+    confidence: float = 0.0
+
+
+class ContentSafetyClassifier(Generator):
+    """Screens an uploaded image at upload time. Mock implementation is a
+    deterministic heuristic (see `MockContentSafetyClassifier`) so the
+    auto-flagging pipeline — flag categories, auto-report creation, admin
+    review — can be built and tested without a real model. The CUDA
+    implementation swaps in a real NSFW classifier on the GPU box."""
+
+    @abstractmethod
+    def classify(self, image_bytes: bytes, content_type: str) -> ContentSafetyResult: ...
+
+
 def segments_to_srt(segments: list[TranscriptSegment]) -> str:
     """Render transcript segments as an SRT subtitle document."""
 

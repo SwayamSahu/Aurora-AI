@@ -18,7 +18,7 @@ from app.schemas.blog import (
     BlogPostSummary,
     BlogPostUpdate,
 )
-from app.services import audit_service, blog_service
+from app.services import audit_service, blog_service, content_safety_service
 from app.storage import get_storage
 
 router = APIRouter(prefix="/blog", tags=["blog"])
@@ -256,6 +256,9 @@ async def upload_media(
     key = f"blog/{current_user.id}/{uuid.uuid4()}-{file.filename or 'upload'}"
     get_storage().put(key, data, content_type)
     media = blog_service.create_media(db, current_user.id, key, content_type)
+    content_safety_service.scan_and_flag(
+        db, media, image_bytes=data, target_type="blog_media"
+    )
     return BlogMediaRead(id=media.id, url=_media_url(media.id))
 
 

@@ -6,7 +6,11 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { isModerator } from "@/lib/admin/access";
-import { listAdminReports, resolveReport, type ReportRead } from "@/lib/reports";
+import {
+  listAdminDmcaRequests,
+  resolveDmcaRequest,
+  type DmcaRequestRead,
+} from "@/lib/dmca";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -18,37 +22,24 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-const TARGET_TYPES = [
-  "blog_post",
-  "blog_comment",
-  "blog_media",
-  "listing",
-  "listing_comment",
-  "listing_media",
-];
-
 const TARGET_LABELS: Record<string, string> = {
   blog_post: "Blog post",
   blog_comment: "Blog comment",
-  blog_media: "Blog image (auto-scan)",
   listing: "Listing",
   listing_comment: "Listing comment",
-  listing_media: "Listing image (auto-scan)",
 };
 
-function ReportRow({ report }: { report: ReportRead }) {
+function DmcaRow({ request }: { request: DmcaRequestRead }) {
   const qc = useQueryClient();
   const [note, setNote] = React.useState("");
   const resolve = useMutation({
-    mutationFn: (status: "resolved" | "dismissed") =>
-      resolveReport(report.id, { status, resolution_note: note.trim() || undefined }),
+    mutationFn: (status: "content_removed" | "rejected") =>
+      resolveDmcaRequest(request.id, { status, resolution_note: note.trim() || undefined }),
     onSuccess: () => {
-      toast.success("Report updated.");
-      qc.invalidateQueries({ queryKey: ["admin-reports"] });
+      toast.success("Request updated.");
+      qc.invalidateQueries({ queryKey: ["admin-dmca"] });
     },
-    onError: (err) => {
-      toast.error(err instanceof Error ? err.message : "Failed.");
-    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : "Failed."),
   });
 
   return (
@@ -56,41 +47,31 @@ function ReportRow({ report }: { report: ReportRead }) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">{TARGET_LABELS[report.target_type]}</Badge>
-            <Badge variant={report.reason === "other" ? "outline" : "secondary"}>
-              {report.reason}
-            </Badge>
-            {report.status !== "open" ? (
-              <Badge variant={report.status === "resolved" ? "success" : "outline"}>
-                {report.status}
+            <Badge variant="outline">{TARGET_LABELS[request.target_type]}</Badge>
+            {request.status !== "open" ? (
+              <Badge variant={request.status === "content_removed" ? "destructive" : "outline"}>
+                {request.status}
               </Badge>
             ) : null}
           </div>
           <p className="mt-2 text-sm font-medium">
-            {report.target_preview ? report.target_preview.title : "(content deleted)"}
+            {request.target_preview ? request.target_preview.title : "(content deleted)"}
           </p>
-          {report.note ? (
-            <p className="mt-1 text-sm text-muted-foreground">
-              &ldquo;{report.note}&rdquo;
-            </p>
-          ) : null}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {request.work_description}
+          </p>
           <p className="mt-2 text-xs text-muted-foreground">
-            Reported by{" "}
-            {report.reporter
-              ? (report.reporter.full_name ?? report.reporter.email)
-              : report.target_type.endsWith("_media")
-                ? "automated content-safety scan"
-                : "a deleted user"}{" "}
-            · {new Date(report.created_at).toLocaleString()}
+            {request.claimant_name} ({request.claimant_email}) ·{" "}
+            {new Date(request.created_at).toLocaleString()}
           </p>
-          {report.resolution_note ? (
+          {request.resolution_note ? (
             <p className="mt-2 text-xs text-muted-foreground">
-              Resolution: {report.resolution_note}
+              Resolution: {request.resolution_note}
             </p>
           ) : null}
         </div>
 
-        {report.status === "open" ? (
+        {request.status === "open" ? (
           <div className="flex shrink-0 flex-col items-end gap-2">
             <input
               value={note}
@@ -102,17 +83,18 @@ function ReportRow({ report }: { report: ReportRead }) {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => resolve.mutate("dismissed")}
+                onClick={() => resolve.mutate("rejected")}
                 loading={resolve.isPending}
               >
-                Dismiss
+                Reject
               </Button>
               <Button
+                variant="destructive"
                 size="sm"
-                onClick={() => resolve.mutate("resolved")}
+                onClick={() => resolve.mutate("content_removed")}
                 loading={resolve.isPending}
               >
-                Resolve
+                Remove content
               </Button>
             </div>
           </div>
@@ -122,20 +104,15 @@ function ReportRow({ report }: { report: ReportRead }) {
   );
 }
 
-export default function AdminReportsPage() {
+export default function AdminDmcaPage() {
   const { user, status } = useAuth();
   const [statusFilter, setStatusFilter] = React.useState("open");
-  const [targetFilter, setTargetFilter] = React.useState("all");
 
   const { data, isLoading } = useQuery({
-    queryKey: [
-      "admin-reports",
-      { status: statusFilter, target_type: targetFilter },
-    ],
+    queryKey: ["admin-dmca", statusFilter],
     queryFn: () =>
-      listAdminReports({
+      listAdminDmcaRequests({
         status: statusFilter === "all" ? undefined : statusFilter,
-        target_type: targetFilter === "all" ? undefined : targetFilter,
       }),
     enabled: isModerator(user),
   });
@@ -159,34 +136,23 @@ export default function AdminReportsPage() {
 
   return (
     <div className="mx-auto w-full max-w-[900px] px-4 py-12 md:px-8">
-      <h1 className="mb-2 text-3xl font-extrabold tracking-tight">Reports</h1>
+      <h1 className="mb-2 text-3xl font-extrabold tracking-tight">
+        DMCA Takedowns
+      </h1>
       <p className="mb-6 text-sm text-muted-foreground">
-        User-flagged posts, comments, and listings awaiting review.
+        Formal copyright takedown notices awaiting review.
       </p>
 
-      <div className="mb-6 flex flex-wrap gap-3">
+      <div className="mb-6">
         <Select value={statusFilter} onValueChange={setStatusFilter}>
           <SelectTrigger className="w-44">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="open">Open</SelectItem>
-            <SelectItem value="resolved">Resolved</SelectItem>
-            <SelectItem value="dismissed">Dismissed</SelectItem>
+            <SelectItem value="content_removed">Content removed</SelectItem>
+            <SelectItem value="rejected">Rejected</SelectItem>
             <SelectItem value="all">All</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select value={targetFilter} onValueChange={setTargetFilter}>
-          <SelectTrigger className="w-48">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All content types</SelectItem>
-            {TARGET_TYPES.map((t) => (
-              <SelectItem key={t} value={t}>
-                {TARGET_LABELS[t]}
-              </SelectItem>
-            ))}
           </SelectContent>
         </Select>
       </div>
@@ -196,11 +162,11 @@ export default function AdminReportsPage() {
       ) : (
         <div className="space-y-3">
           {(data?.items ?? []).map((r) => (
-            <ReportRow key={r.id} report={r} />
+            <DmcaRow key={r.id} request={r} />
           ))}
           {data && data.items.length === 0 ? (
             <p className="py-16 text-center text-sm text-muted-foreground">
-              No reports match this filter.
+              No requests match this filter.
             </p>
           ) : null}
         </div>

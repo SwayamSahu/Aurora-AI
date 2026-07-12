@@ -1,13 +1,14 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
-import { changePassword } from "@/lib/api/auth";
+import { changePassword, eraseMyAccount, exportMyData } from "@/lib/api/auth";
 import { ApiError } from "@/lib/api/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,107 @@ const schema = z
   });
 
 type Values = z.infer<typeof schema>;
+
+function ExportDataCard() {
+  const [loading, setLoading] = React.useState(false);
+
+  async function download() {
+    setLoading(true);
+    try {
+      const data = await exportMyData();
+      const blob = new Blob([JSON.stringify(data, null, 2)], {
+        type: "application/json",
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `aurora-data-export-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success("Your data export has downloaded.");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Export failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your data</CardTitle>
+        <CardDescription>
+          Download everything Aurora holds about your account — profile,
+          posts, listings, orders, and wallet history — as a JSON file.
+        </CardDescription>
+      </CardHeader>
+      <CardFooter className="justify-end">
+        <Button variant="outline" onClick={download} loading={loading}>
+          Download my data
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+}
+
+function DeleteAccountDialog() {
+  const router = useRouter();
+  const { logout } = useAuth();
+  const [password, setPassword] = React.useState("");
+  const [loading, setLoading] = React.useState(false);
+  const [open, setOpen] = React.useState(false);
+
+  async function submit() {
+    if (!password) {
+      toast.error("Enter your password to confirm.");
+      return;
+    }
+    setLoading(true);
+    try {
+      await eraseMyAccount(password);
+      toast.success("Your account has been deleted.");
+      logout();
+      router.push("/");
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : "Deletion failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="destructive">Delete account</Button>
+      </DialogTrigger>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete account?</DialogTitle>
+          <DialogDescription>
+            This permanently scrubs your email, name, and password from your
+            account and signs you out everywhere. It can&apos;t be undone.
+            Enter your password to confirm.
+          </DialogDescription>
+        </DialogHeader>
+        <Input
+          type="password"
+          placeholder="Password"
+          autoComplete="current-password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+        />
+        <DialogFooter>
+          <DialogClose asChild>
+            <Button variant="outline">Cancel</Button>
+          </DialogClose>
+          <Button variant="destructive" onClick={submit} loading={loading}>
+            Delete my account
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export function SecuritySettings() {
   const { logout } = useAuth();
@@ -129,6 +231,8 @@ export function SecuritySettings() {
         </Form>
       </Card>
 
+      <ExportDataCard />
+
       <Card className="border-destructive/40">
         <CardHeader>
           <CardTitle className="text-destructive">Danger zone</CardTitle>
@@ -140,25 +244,7 @@ export function SecuritySettings() {
           <Button variant="outline" onClick={logout}>
             Sign out
           </Button>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button variant="destructive">Delete account</Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Delete account?</DialogTitle>
-                <DialogDescription>
-                  Account deletion isn&apos;t available yet. It will permanently
-                  remove your projects and generated media in a future update.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <DialogClose asChild>
-                  <Button variant="outline">Close</Button>
-                </DialogClose>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+          <DeleteAccountDialog />
         </CardFooter>
       </Card>
     </div>

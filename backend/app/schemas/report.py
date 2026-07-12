@@ -4,7 +4,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field, field_validator
 
-from app.services.report_service import TARGET_TYPES
+from app.services.report_service import USER_REPORTABLE_TARGET_TYPES
 
 
 class ReportCreate(BaseModel):
@@ -16,8 +16,10 @@ class ReportCreate(BaseModel):
     @field_validator("target_type")
     @classmethod
     def target_type_is_valid(cls, value: str) -> str:
-        if value not in TARGET_TYPES:
-            raise ValueError(f"target_type must be one of {sorted(TARGET_TYPES)}.")
+        if value not in USER_REPORTABLE_TARGET_TYPES:
+            raise ValueError(
+                f"target_type must be one of {sorted(USER_REPORTABLE_TARGET_TYPES)}."
+            )
         return value
 
     @field_validator("reason")

@@ -8,7 +8,12 @@ import { toast } from "sonner";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { isAdmin } from "@/lib/admin/access";
-import { getAdminUserDetail, updateAdminUser, type AdminRole } from "@/lib/admin/users";
+import {
+  eraseAdminUser,
+  getAdminUserDetail,
+  updateAdminUser,
+  type AdminRole,
+} from "@/lib/admin/users";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -46,6 +51,8 @@ export default function AdminUserDetailPage() {
   const { user: me, status } = useAuth();
   const qc = useQueryClient();
   const [pendingRole, setPendingRole] = React.useState<AdminRole | null>(null);
+  const [eraseConfirmOpen, setEraseConfirmOpen] = React.useState(false);
+  const [erasing, setErasing] = React.useState(false);
 
   const { data: detail, isLoading } = useQuery({
     queryKey: ["admin-user-detail", params.id],
@@ -75,6 +82,21 @@ export default function AdminUserDetailPage() {
       qc.invalidateQueries({ queryKey: ["admin-users"] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to update status.");
+    }
+  }
+
+  async function eraseUser() {
+    setErasing(true);
+    try {
+      await eraseAdminUser(params.id);
+      toast.success("User erased (GDPR).");
+      qc.invalidateQueries({ queryKey: ["admin-user-detail", params.id] });
+      qc.invalidateQueries({ queryKey: ["admin-users"] });
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Erasure failed.");
+    } finally {
+      setErasing(false);
+      setEraseConfirmOpen(false);
     }
   }
 
@@ -126,6 +148,9 @@ export default function AdminUserDetailPage() {
             ) : (
               <Badge variant="destructive">Suspended</Badge>
             )}
+            {detail.erased_at ? (
+              <Badge variant="destructive">Erased (GDPR)</Badge>
+            ) : null}
           </div>
         </div>
 
@@ -133,7 +158,7 @@ export default function AdminUserDetailPage() {
           <Select
             value={detail.role}
             onValueChange={(v) => setPendingRole(v as AdminRole)}
-            disabled={isSelf}
+            disabled={isSelf || !!detail.erased_at}
           >
             <SelectTrigger className="w-40">
               <SelectValue />
@@ -148,22 +173,57 @@ export default function AdminUserDetailPage() {
             <p className="text-xs text-muted-foreground">
               You can&apos;t change your own role or status.
             </p>
+          ) : detail.erased_at ? (
+            <p className="text-xs text-muted-foreground">
+              This account has already been erased.
+            </p>
           ) : (
-            <Button
-              variant="outline"
-              size="sm"
-              className={
-                detail.is_active
-                  ? "text-destructive hover:text-destructive"
-                  : undefined
-              }
-              onClick={toggleActive}
-            >
-              {detail.is_active ? "Suspend account" : "Reactivate account"}
-            </Button>
+            <>
+              <Button
+                variant="outline"
+                size="sm"
+                className={
+                  detail.is_active
+                    ? "text-destructive hover:text-destructive"
+                    : undefined
+                }
+                onClick={toggleActive}
+              >
+                {detail.is_active ? "Suspend account" : "Reactivate account"}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setEraseConfirmOpen(true)}
+              >
+                Erase (GDPR)
+              </Button>
+            </>
           )}
         </div>
       </div>
+
+      <Dialog open={eraseConfirmOpen} onOpenChange={setEraseConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Erase this account?</DialogTitle>
+            <DialogDescription>
+              Scrubs {detail.email}&apos;s name, email, and password. Their
+              posts, listings, and order history stay in place but read as
+              anonymous. This can&apos;t be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <DialogClose asChild>
+              <Button variant="outline">Cancel</Button>
+            </DialogClose>
+            <Button variant="destructive" onClick={eraseUser} loading={erasing}>
+              Erase account
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={pendingRole !== null} onOpenChange={(open) => !open && setPendingRole(null)}>
         <DialogContent>

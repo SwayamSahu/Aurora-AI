@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import {
+  Activity,
+  Copyright,
   Flag,
   FileText,
   Receipt,
@@ -40,6 +42,13 @@ const SECTIONS = [
     adminOnly: false,
   },
   {
+    href: "/admin/dmca",
+    icon: Copyright,
+    title: "DMCA Takedowns",
+    description: "Formal copyright takedown notices awaiting review.",
+    adminOnly: false,
+  },
+  {
     href: "/admin/users",
     icon: Users,
     title: "User Management",
@@ -68,6 +77,14 @@ const SECTIONS = [
     title: "Audit Log",
     description:
       "Append-only record of every privileged admin and moderator action.",
+    adminOnly: true,
+  },
+  {
+    href: "/admin/system",
+    icon: Activity,
+    title: "System Health",
+    description:
+      "Live database/Redis/storage status and platform-scale counts.",
     adminOnly: true,
   },
 ];

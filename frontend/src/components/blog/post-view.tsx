@@ -90,6 +90,12 @@ export function PostView({
           </span>
           <LikeButton post={post} slug={slug} />
           <ReportButton targetType="blog_post" targetId={post.id} />
+          <Link
+            href={`/dmca?target_type=blog_post&target_id=${post.id}`}
+            className="text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Report copyright
+          </Link>
           {isAuthor ? (
             <Link
               href={`/blog/${slug}/edit`}

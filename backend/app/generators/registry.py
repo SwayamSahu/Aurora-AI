@@ -14,6 +14,7 @@ from functools import lru_cache
 
 from app.core.config import AudioBackend, GeneratorBackend, settings
 from app.generators.base import (
+    ContentSafetyClassifier,
     ImageGenerator,
     ImageToVideoGenerator,
     MusicGenerator,
@@ -24,6 +25,7 @@ from app.generators.base import (
     VoiceGenerator,
 )
 from app.generators.mock import (
+    MockContentSafetyClassifier,
     MockImageGenerator,
     MockImageToVideoGenerator,
     MockMusicGenerator,
@@ -134,3 +136,12 @@ def get_music_generator() -> MusicGenerator:
     from app.generators.cuda import CudaMusicGenerator  # noqa: PLC0415
 
     return CudaMusicGenerator()
+
+
+@lru_cache
+def get_content_safety_classifier() -> ContentSafetyClassifier:
+    # A real NSFW/violence classifier is GPU-bound — real impl arrives in
+    # Phase 9. The mock heuristic is what runs on every upload today.
+    if settings.generator_backend == GeneratorBackend.MOCK:
+        return MockContentSafetyClassifier()
+    _cuda_not_ready("content safety classifier")
