@@ -37,6 +37,7 @@ export interface AppliedEdit {
   presetId: string;
   label: string;
   prompt: string;
+  params?: Record<string, unknown>;
 }
 
 export function PromptPanel({
@@ -71,6 +72,7 @@ export function PromptPanel({
       presetId: activePreset.id,
       label: activePreset.label,
       prompt: resolvePrompt(activePreset, text),
+      params: activePreset.params,
     });
     setText("");
   }

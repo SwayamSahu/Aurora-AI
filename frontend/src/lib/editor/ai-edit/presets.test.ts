@@ -58,4 +58,44 @@ describe("AI edit preset catalog", () => {
       "make it cinematic",
     );
   });
+
+  it("relight/atmosphere presets use global-restyle full-frame in the lighting category", () => {
+    const ids = [
+      "relight-storm",
+      "relight-candlelight",
+      "relight-rim",
+      "relight-underwater",
+      "relight-aurora-glow",
+    ];
+    for (const id of ids) {
+      const p = EDIT_PRESETS.find((x) => x.id === id)!;
+      expect(p, `missing preset ${id}`).toBeDefined();
+      expect(p.category).toBe("lighting");
+      expect(p.engine).toBe("global-restyle");
+      expect(p.maskMode).toBe("full-frame");
+      expect(needsPaintedMask(p)).toBe(false);
+    }
+  });
+
+  it("swap-precise carries a lower diffusion strength for pose preservation", () => {
+    const p = EDIT_PRESETS.find((x) => x.id === "swap-precise")!;
+    expect(p).toBeDefined();
+    expect(p.engine).toBe("masked-v2v");
+    expect(needsPaintedMask(p)).toBe(true);
+    expect(needsPromptInput(p)).toBe(true);
+    expect(p.params?.strength).toBe(0.55);
+  });
+
+  it("reframe presets use the retime-camera engine with no mask", () => {
+    const ids = ["cam-closeup", "cam-wide", "cam-vertical", "cam-dutch", "cam-thirds"];
+    for (const id of ids) {
+      const p = EDIT_PRESETS.find((x) => x.id === id)!;
+      expect(p, `missing preset ${id}`).toBeDefined();
+      expect(p.category).toBe("motion-camera");
+      expect(p.engine).toBe("retime-camera");
+      expect(p.maskMode).toBe("full-frame");
+      expect(needsPaintedMask(p)).toBe(false);
+      expect(needsPromptInput(p)).toBe(false);
+    }
+  });
 });

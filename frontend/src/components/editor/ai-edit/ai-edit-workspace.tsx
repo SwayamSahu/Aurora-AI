@@ -212,6 +212,7 @@ export function AiEditWorkspace({ projectId }: { projectId: string }) {
         preset_id: edit.presetId,
         label: edit.label,
         prompt: edit.prompt,
+        params: edit.params,
         source_asset_id: clip.asset_id,
         mask_base64: maskBase64,
       });

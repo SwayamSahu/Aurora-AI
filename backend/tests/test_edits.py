@@ -57,6 +57,34 @@ def test_edit_layer_runs_and_produces_asset(db_session, sample_project):
     assert layer.progress == 1.0
 
 
+def test_custom_params_persist_and_run(db_session, sample_project):
+    """`swap-precise` sends a lower diffusion strength via `params` — the mock
+    editor ignores it (real strength only matters on the CUDA generative
+    path) but the value must round-trip through creation and survive a run."""
+    from app.schemas.edit_layer import EditLayerCreate
+
+    source = _make_video_asset(db_session, sample_project)
+    layer = edit_service.create(
+        db_session,
+        sample_project,
+        EditLayerCreate(
+            clip_id="clip-precise",
+            engine="masked-v2v",
+            preset_id="swap-precise",
+            label="Precise object swap",
+            prompt="a red bicycle",
+            params={"strength": 0.55},
+            source_asset_id=source.id,
+        ),
+    )
+    assert layer.params == {"strength": 0.55}
+
+    run_edit(db_session, layer)
+    db_session.refresh(layer)
+    assert layer.status == EditLayerStatus.SUCCEEDED
+    assert layer.params == {"strength": 0.55}
+
+
 def test_missing_source_fails_gracefully(db_session, sample_project):
     from app.schemas.edit_layer import EditLayerCreate
 

@@ -13,7 +13,7 @@ import pytest
 
 from app.db.models.asset import AssetKind, AssetSource
 from app.db.models.edit_layer import EditLayerStatus
-from app.generators.mock.editor import _probe_duration
+from app.generators.mock.editor import _probe_duration, _probe_size
 from app.schemas.edit_layer import EditLayerCreate
 from app.services import asset_service, edit_service
 from app.services.edit_runner import run_edit
@@ -181,6 +181,85 @@ def test_camera_modes_succeed(db_session, sample_project):
         assert layer.status == EditLayerStatus.SUCCEEDED, (preset_id, layer.error)
 
 
+def test_reframe_modes_succeed(db_session, sample_project):
+    source = _make_video_asset(db_session, sample_project)
+    for preset_id in ("cam-closeup", "cam-wide", "cam-vertical", "cam-dutch", "cam-thirds"):
+        layer = _create_layer(
+            db_session,
+            sample_project,
+            source,
+            engine="retime-camera",
+            preset_id=preset_id,
+            clip_id=preset_id,
+        )
+        run_edit(db_session, layer)
+        db_session.refresh(layer)
+        assert layer.status == EditLayerStatus.SUCCEEDED, (preset_id, layer.error)
+
+
+def test_reframe_vertical_produces_9_16_aspect(db_session, sample_project):
+    source = _make_video_asset(db_session, sample_project)
+    layer = _create_layer(
+        db_session,
+        sample_project,
+        source,
+        engine="retime-camera",
+        preset_id="cam-vertical",
+    )
+    run_edit(db_session, layer)
+    db_session.refresh(layer)
+    assert layer.status == EditLayerStatus.SUCCEEDED, layer.error
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as f:
+        f.write(_download(db_session, layer))
+        f.flush()
+        w, h = _probe_size(Path(f.name))
+    assert w / h == pytest.approx(9 / 16, rel=0.05)
+
+
+def test_reframe_wide_produces_letterbox_aspect(db_session, sample_project):
+    source = _make_video_asset(db_session, sample_project)
+    layer = _create_layer(
+        db_session,
+        sample_project,
+        source,
+        engine="retime-camera",
+        preset_id="cam-wide",
+    )
+    run_edit(db_session, layer)
+    db_session.refresh(layer)
+    assert layer.status == EditLayerStatus.SUCCEEDED, layer.error
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as f:
+        f.write(_download(db_session, layer))
+        f.flush()
+        w, h = _probe_size(Path(f.name))
+    assert w / h == pytest.approx(2.39, rel=0.05)
+
+
+def test_reframe_closeup_preserves_output_resolution(db_session, sample_project):
+    """The punch-in crop scales back up so downstream timeline compositing
+    doesn't need to handle a resolution change."""
+    source = _make_video_asset(db_session, sample_project)
+    src_w, src_h = _probe_size(FIXTURE)
+    layer = _create_layer(
+        db_session,
+        sample_project,
+        source,
+        engine="retime-camera",
+        preset_id="cam-closeup",
+    )
+    run_edit(db_session, layer)
+    db_session.refresh(layer)
+    assert layer.status == EditLayerStatus.SUCCEEDED, layer.error
+
+    with tempfile.NamedTemporaryFile(suffix=".mp4") as f:
+        f.write(_download(db_session, layer))
+        f.flush()
+        out_w, out_h = _probe_size(Path(f.name))
+    assert (out_w, out_h) == (src_w, src_h)
+
+
 # --------------------------------------------------------------------------- #
 # Masked edit — the maskedmerge path (mask sized differently from the source)
 # --------------------------------------------------------------------------- #
@@ -256,6 +335,82 @@ def test_grade_recipes_produce_distinct_output(db_session, sample_project):
     neon_bytes = _download(db_session, neon)
     # Different real color-grade filters must not collapse to the same output.
     assert cinematic_bytes != neon_bytes
+
+
+def test_relight_presets_excluded_from_grade_recipes():
+    """The whole point of `relight-*`: they must NOT be in GRADE_RECIPES, so
+    the CUDA editor's dispatch (`preset_id in GRADE_RECIPES`) falls through
+    to the real generative img2img path instead of an FFmpeg color curve."""
+    from app.generators.mock.editor import GRADE_RECIPES, _RELIGHT_PRESETS
+
+    for preset_id in _RELIGHT_PRESETS:
+        assert preset_id not in GRADE_RECIPES, preset_id
+
+
+def test_relight_presets_succeed(db_session, sample_project):
+    from app.generators.mock.editor import _RELIGHT_PRESETS
+
+    source = _make_video_asset(db_session, sample_project)
+    for i, preset_id in enumerate(_RELIGHT_PRESETS):
+        layer = _create_layer(
+            db_session,
+            sample_project,
+            source,
+            engine="global-restyle",
+            preset_id=preset_id,
+            clip_id=f"relight-{i}",
+        )
+        run_edit(db_session, layer)
+        db_session.refresh(layer)
+        assert layer.status == EditLayerStatus.SUCCEEDED, (preset_id, layer.error)
+
+
+def test_relight_stand_in_distinct_from_grade_and_generic_fallback(
+    db_session, sample_project
+):
+    """The relight stand-in (vignette) must not collide with a real grade
+    recipe's output, nor with the generic global-restyle fallback used by
+    weather/magic-prompt presets that also lack a grade recipe."""
+    source = _make_video_asset(db_session, sample_project)
+    relight = _create_layer(
+        db_session,
+        sample_project,
+        source,
+        engine="global-restyle",
+        preset_id="relight-storm",
+        clip_id="relight-diff-1",
+    )
+    grade = _create_layer(
+        db_session,
+        sample_project,
+        source,
+        engine="global-restyle",
+        preset_id="light-cinematic",
+        clip_id="relight-diff-2",
+    )
+    generic = _create_layer(
+        db_session,
+        sample_project,
+        source,
+        engine="global-restyle",
+        preset_id="weather-fog",  # not a grade recipe, not a relight preset
+        clip_id="relight-diff-3",
+    )
+    run_edit(db_session, relight)
+    run_edit(db_session, grade)
+    run_edit(db_session, generic)
+    db_session.refresh(relight)
+    db_session.refresh(grade)
+    db_session.refresh(generic)
+    assert relight.status == EditLayerStatus.SUCCEEDED
+    assert grade.status == EditLayerStatus.SUCCEEDED
+    assert generic.status == EditLayerStatus.SUCCEEDED
+
+    relight_bytes = _download(db_session, relight)
+    grade_bytes = _download(db_session, grade)
+    generic_bytes = _download(db_session, generic)
+    assert relight_bytes != grade_bytes
+    assert relight_bytes != generic_bytes
 
 
 def test_all_lighting_and_time_season_presets_succeed(db_session, sample_project):

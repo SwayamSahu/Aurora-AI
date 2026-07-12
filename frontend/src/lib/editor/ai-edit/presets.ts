@@ -43,6 +43,8 @@ export interface EditPreset {
    * without the placeholder run as-is and the prompt box becomes optional.
    */
   prompt: string;
+  /** Extra engine params (e.g. diffusion strength) sent through unchanged. */
+  params?: Record<string, unknown>;
 }
 
 export interface EditCategory {
@@ -74,6 +76,7 @@ export const EDIT_PRESETS: EditPreset[] = [
   { id: "retexture", label: "Change texture", category: "transform", engine: "masked-v2v", maskMode: "painted", prompt: "change the texture of the selected region to {prompt}, keep shape and lighting" },
   { id: "rematerial", label: "Change material", category: "transform", engine: "masked-v2v", maskMode: "painted", prompt: "make the selected object out of {prompt}, keep perspective and shadows" },
   { id: "replace-object", label: "Replace object", category: "transform", engine: "masked-v2v", maskMode: "painted", prompt: "replace the selected object with {prompt}, matching perspective, scale, lighting, shadows and motion" },
+  { id: "swap-precise", label: "Precise object swap", category: "transform", engine: "masked-v2v", maskMode: "painted", prompt: "replace the selected object with {prompt}, matching perspective, scale, lighting, shadows and motion — preserve the original pose and motion as closely as possible", params: { strength: 0.55 } },
   { id: "add-object", label: "Add object", category: "transform", engine: "masked-v2v", maskMode: "painted", prompt: "add {prompt} in the selected region, matching scale, lighting and perspective" },
   { id: "replace-animal", label: "Replace animal", category: "transform", engine: "masked-v2v", maskMode: "painted", prompt: "replace the selected animal with {prompt}, preserving its motion, skeleton animation and lighting" },
   { id: "replace-vehicle", label: "Replace vehicle", category: "transform", engine: "masked-v2v", maskMode: "painted", prompt: "replace the selected vehicle with {prompt}, preserving motion, perspective and reflections" },
@@ -139,6 +142,11 @@ export const EDIT_PRESETS: EditPreset[] = [
   { id: "light-soft", label: "Soft light", category: "lighting", engine: "global-restyle", maskMode: "full-frame", prompt: "soft diffused flattering light" },
   { id: "light-golden", label: "Golden light", category: "lighting", engine: "global-restyle", maskMode: "full-frame", prompt: "warm golden light wash" },
   { id: "light-volumetric", label: "Volumetric rays", category: "lighting", engine: "global-restyle", maskMode: "full-frame", prompt: "add volumetric light shafts and god rays" },
+  { id: "relight-storm", label: "Dramatic storm light", category: "lighting", engine: "global-restyle", maskMode: "full-frame", prompt: "relight the scene with dramatic storm lighting: heavy overcast, cool blue-grey tones and rim light breaking through clouds" },
+  { id: "relight-candlelight", label: "Candlelight glow", category: "lighting", engine: "global-restyle", maskMode: "full-frame", prompt: "relight the scene with warm flickering candlelight, soft golden glow and deep shadows" },
+  { id: "relight-rim", label: "Rim / backlight", category: "lighting", engine: "global-restyle", maskMode: "full-frame", prompt: "add strong rim lighting from behind the subject, glowing edges against a darker background" },
+  { id: "relight-underwater", label: "Underwater caustics", category: "lighting", engine: "global-restyle", maskMode: "full-frame", prompt: "relight the scene as if underwater, with dancing caustic light patterns and a cool blue-green tint" },
+  { id: "relight-aurora-glow", label: "Aurora glow wash", category: "lighting", engine: "global-restyle", maskMode: "full-frame", prompt: "relight the scene with a shifting aurora-borealis-like ambient glow, soft green and violet color wash" },
 
   /* ------------------------------- Style ------------------------------- */
   { id: "style-3d-animation", label: "3D animation", category: "style", engine: "global-restyle", maskMode: "full-frame", prompt: "restyle as a polished 3d animated film look, keep motion" },
@@ -204,6 +212,11 @@ export const EDIT_PRESETS: EditPreset[] = [
   { id: "cam-pan", label: "Virtual pan", category: "motion-camera", engine: "retime-camera", maskMode: "full-frame", prompt: "add a slow virtual pan across the frame" },
   { id: "cam-zoom", label: "Virtual zoom", category: "motion-camera", engine: "retime-camera", maskMode: "full-frame", prompt: "add a slow cinematic push-in zoom" },
   { id: "cam-orbit", label: "Orbit", category: "motion-camera", engine: "retime-camera", maskMode: "full-frame", prompt: "simulate a subtle orbit around the subject" },
+  { id: "cam-closeup", label: "Punch in to close-up", category: "motion-camera", engine: "retime-camera", maskMode: "full-frame", prompt: "reframe from a wide shot into a tight close-up" },
+  { id: "cam-wide", label: "Cinematic widescreen", category: "motion-camera", engine: "retime-camera", maskMode: "full-frame", prompt: "reframe to a wide cinematic 2.39:1 aspect ratio" },
+  { id: "cam-vertical", label: "Reframe to vertical", category: "motion-camera", engine: "retime-camera", maskMode: "full-frame", prompt: "reframe to a 9:16 vertical crop for social" },
+  { id: "cam-dutch", label: "Dutch angle", category: "motion-camera", engine: "retime-camera", maskMode: "full-frame", prompt: "tilt the camera angle for a dramatic dutch-angle composition" },
+  { id: "cam-thirds", label: "Rule-of-thirds reframe", category: "motion-camera", engine: "retime-camera", maskMode: "full-frame", prompt: "recompose the shot to place the subject on a rule-of-thirds line" },
 
   /* -------------------------------- Text ------------------------------- */
   { id: "text-detect", label: "Detect text", category: "text", engine: "text-ops", maskMode: "auto-text", prompt: "detect all readable text in the video" },

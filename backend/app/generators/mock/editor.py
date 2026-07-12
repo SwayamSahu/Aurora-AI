@@ -7,11 +7,12 @@ id passed through as `params.preset_id`:
                       setpts/concat/tpad, and real stabilize/pan/zoom/orbit
                       via deshake/crop/zoompan/rotate.
   - global-restyle  → real color grading (eq/colorbalance/curves/vignette/
-                      noise) for the `lighting` and `time-season` catalog
-                      categories. Presets outside those categories (sky
-                      replacement, style transfer, weather particles, …)
-                      genuinely need a generative model and keep a labeled
-                      stand-in filter until the CUDA editor (Phase 9).
+                      noise) for the color-curve presets in `GRADE_RECIPES`
+                      (most of `lighting` and `time-season`). The rest —
+                      sky replacement, style transfer, weather particles,
+                      and the `relight-*` atmosphere presets — genuinely
+                      need a generative model and keep a labeled stand-in
+                      filter until the CUDA editor (Phase 9).
   - text-ops        → real on-screen text DETECTION via Tesseract OCR,
                       drawn as a timed overlay. Text replace/translate/
                       remove/restyle still need generative inpainting and
@@ -94,7 +95,28 @@ _RETIME_MODE: dict[str, str] = {
     "cam-pan": "pan",
     "cam-zoom": "zoom",
     "cam-orbit": "orbit",
+    "cam-closeup": "closeup",
+    "cam-wide": "wide",
+    "cam-vertical": "vertical",
+    "cam-dutch": "dutch",
+    "cam-thirds": "thirds",
 }
+
+# -- Relight & Atmosphere: `lighting` presets kept out of GRADE_RECIPES on
+# purpose so the CUDA editor falls through to the real generative img2img
+# path instead of an FFmpeg color curve. The mock stand-in below is a
+# distinct filter (vignette + desaturation) so it doesn't collide with the
+# generic global-restyle fallback used by weather/magic-prompt edits.
+_RELIGHT_PRESETS: frozenset[str] = frozenset(
+    {
+        "relight-storm",
+        "relight-candlelight",
+        "relight-rim",
+        "relight-underwater",
+        "relight-aurora-glow",
+    }
+)
+_RELIGHT_FILTER = "eq=contrast=1.08:saturation=0.9,vignette=PI/4"
 
 
 def _run(cmd: list[str]) -> None:
@@ -237,6 +259,8 @@ class MockVideoEditor(VideoEditor):
     def _pick_filter(self, params: VideoEditParams) -> str:
         if params.engine == "global-restyle" and params.preset_id in GRADE_RECIPES:
             return GRADE_RECIPES[params.preset_id]
+        if params.engine == "global-restyle" and params.preset_id in _RELIGHT_PRESETS:
+            return _RELIGHT_FILTER
         return _ENGINE_FILTER.get(params.engine, "hue=h=110:s=1.3")
 
     def _filter(self, src: Path, out: Path, params: VideoEditParams, d: Path) -> None:
@@ -345,6 +369,20 @@ class MockVideoEditor(VideoEditor):
                 "rotate=a='0.035*sin(2*PI*t/4)':fillcolor=black@0,"
                 "crop=iw/1.15:ih/1.15"
             )
+        elif mode == "closeup":
+            w, h = _probe_size(src)
+            b.simple(f"crop=iw*0.55:ih*0.55,scale={w}:{h}")
+        elif mode == "wide":
+            b.simple("crop=iw:'iw/2.39':0:'(ih-iw/2.39)/2'")
+        elif mode == "vertical":
+            b.simple("crop='ih*9/16':ih:'(iw-ih*9/16)/2':0")
+        elif mode == "dutch":
+            b.simple(
+                "rotate=a=8*PI/180:fillcolor=black,"
+                "crop=iw*0.85:ih*0.85"
+            )
+        elif mode == "thirds":
+            b.simple("crop=iw*0.8:ih*0.8:iw*0.15:ih*0.1")
         elif mode == "boomerang":
             b.complex("[0:v]split[a][b];[b]reverse[r];[a][r]concat=n=2:v=1:a=0[v]")
         elif mode == "loop":
