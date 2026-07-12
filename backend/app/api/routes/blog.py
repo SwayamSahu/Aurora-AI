@@ -18,7 +18,7 @@ from app.schemas.blog import (
     BlogPostSummary,
     BlogPostUpdate,
 )
-from app.services import blog_service
+from app.services import audit_service, blog_service
 from app.storage import get_storage
 
 router = APIRouter(prefix="/blog", tags=["blog"])
@@ -83,7 +83,7 @@ def get_post(slug: str, db: DbSession, current_user: OptionalUser) -> BlogPostDe
     # Drafts are visible only to their author or an admin.
     if post.status.value == "draft" and (
         current_user is None
-        or (current_user.id != post.author_id and not current_user.is_superuser)
+        or (current_user.id != post.author_id and not current_user.is_moderator)
     ):
         raise HTTPException(status_code=404, detail="Post not found.")
 
@@ -113,7 +113,7 @@ def _owned_post(db: DbSession, current_user: User, post_id: str) -> BlogPost:
     post = blog_service.get_by_id(db, post_id)
     if post is None:
         raise HTTPException(status_code=404, detail="Post not found.")
-    if post.author_id != current_user.id and not current_user.is_superuser:
+    if post.author_id != current_user.id and not current_user.is_moderator:
         raise HTTPException(status_code=403, detail="Not your post.")
     return post
 
@@ -136,17 +136,39 @@ def update_post(
     db: DbSession,
 ) -> BlogPostDetail:
     post = _owned_post(db, current_user, post_id)
+    acting_as_mod = post.author_id != current_user.id
     post = blog_service.update(db, post, data)
     out = BlogPostDetail.model_validate(post)
     out.cover_url = _cover_url(post)
     out.liked_by_me = blog_service.is_liked_by(db, post.id, current_user.id)
+    if acting_as_mod:
+        audit_service.record(
+            db,
+            actor_id=current_user.id,
+            action="post.update",
+            target_type="blog_post",
+            target_id=post.id,
+            metadata={"title": post.title, "author_id": post.author_id},
+        )
     return out
 
 
 @router.delete("/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_post(post_id: str, current_user: CurrentUser, db: DbSession) -> Response:
     post = _owned_post(db, current_user, post_id)
+    acting_as_mod = post.author_id != current_user.id
+    snapshot = {"title": post.title, "author_id": post.author_id}
+    pid = post.id
     blog_service.delete_post(db, post)
+    if acting_as_mod:
+        audit_service.record(
+            db,
+            actor_id=current_user.id,
+            action="post.delete",
+            target_type="blog_post",
+            target_id=pid,
+            metadata=snapshot,
+        )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -193,9 +215,20 @@ def delete_comment(
     comment: BlogComment | None = blog_service.get_comment(db, comment_id)
     if comment is None:
         raise HTTPException(status_code=404, detail="Comment not found.")
-    if comment.author_id != current_user.id and not current_user.is_superuser:
+    if comment.author_id != current_user.id and not current_user.is_moderator:
         raise HTTPException(status_code=403, detail="Not your comment.")
+    acting_as_mod = comment.author_id != current_user.id
+    cid, cauthor = comment.id, comment.author_id
     blog_service.delete_comment(db, comment)
+    if acting_as_mod:
+        audit_service.record(
+            db,
+            actor_id=current_user.id,
+            action="blog_comment.delete",
+            target_type="blog_comment",
+            target_id=cid,
+            metadata={"author_id": cauthor},
+        )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 

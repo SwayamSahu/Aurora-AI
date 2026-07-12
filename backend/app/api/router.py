@@ -6,6 +6,7 @@ from fastapi import APIRouter
 
 from app.api.routes import (
     admin,
+    admin_audit,
     admin_blog,
     assets,
     audio,
@@ -40,6 +41,7 @@ api_router.include_router(listings.router)
 api_router.include_router(commerce.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_blog.router)
+api_router.include_router(admin_audit.router)
 api_router.include_router(timeline.router)
 api_router.include_router(audio.router)
 api_router.include_router(export.router)

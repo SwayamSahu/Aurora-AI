@@ -102,9 +102,20 @@ FlexibleUser = Annotated[User, Depends(get_current_user_flexible)]
 
 
 def get_admin_user(current_user: CurrentUser) -> User:
+    """Full admin (role == admin): finance + user management + everything a
+    moderator can do."""
     if not current_user.is_superuser:
         raise HTTPException(status_code=403, detail="Admin access required.")
     return current_user
 
 
+def get_moderator_user(current_user: CurrentUser) -> User:
+    """Moderator OR admin — for content moderation routes that don't touch
+    money or user accounts."""
+    if not current_user.is_moderator:
+        raise HTTPException(status_code=403, detail="Moderator access required.")
+    return current_user
+
+
 AdminUser = Annotated[User, Depends(get_admin_user)]
+ModeratorUser = Annotated[User, Depends(get_moderator_user)]

@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { MessageSquare, Pencil, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { isAdmin, isModerator } from "@/lib/admin/access";
 import {
   useAdminAdjustWallet,
   useAdminDelistListing,
@@ -416,7 +417,7 @@ export default function AdminMarketplacePage() {
     );
   }
 
-  if (status !== "authenticated" || !user?.is_superuser) {
+  if (status !== "authenticated" || !isModerator(user)) {
     return (
       <p className="py-24 text-center text-muted-foreground">
         Admin access required.
@@ -424,31 +425,39 @@ export default function AdminMarketplacePage() {
     );
   }
 
+  // Finance tabs (plans, wallet, refunds) are admin-only; moderators only
+  // get listing + comment moderation.
+  const admin = isAdmin(user);
+
   return (
     <div className="mx-auto w-full max-w-[900px] px-4 py-12 md:px-8">
       <h1 className="mb-8 text-3xl font-extrabold tracking-tight">
         Marketplace Admin
       </h1>
 
-      <Tabs defaultValue="plans">
+      <Tabs defaultValue="listings">
         <TabsList>
-          <TabsTrigger value="plans">Plans</TabsTrigger>
           <TabsTrigger value="listings">Listings</TabsTrigger>
-          <TabsTrigger value="wallet">Wallet Adjust</TabsTrigger>
-          <TabsTrigger value="refund">Refund</TabsTrigger>
+          {admin ? <TabsTrigger value="plans">Plans</TabsTrigger> : null}
+          {admin ? <TabsTrigger value="wallet">Wallet Adjust</TabsTrigger> : null}
+          {admin ? <TabsTrigger value="refund">Refund</TabsTrigger> : null}
         </TabsList>
-        <TabsContent value="plans">
-          <PlansTab />
-        </TabsContent>
         <TabsContent value="listings">
           <ListingsTab />
         </TabsContent>
-        <TabsContent value="wallet">
-          <WalletAdjustTab />
-        </TabsContent>
-        <TabsContent value="refund">
-          <RefundTab />
-        </TabsContent>
+        {admin ? (
+          <>
+            <TabsContent value="plans">
+              <PlansTab />
+            </TabsContent>
+            <TabsContent value="wallet">
+              <WalletAdjustTab />
+            </TabsContent>
+            <TabsContent value="refund">
+              <RefundTab />
+            </TabsContent>
+          </>
+        ) : null}
       </Tabs>
     </div>
   );

@@ -19,6 +19,7 @@ class UserRead(UserBase):
 
     id: str
     is_active: bool
+    role: str
     is_superuser: bool
     preferences: dict = Field(default_factory=dict)
     created_at: datetime

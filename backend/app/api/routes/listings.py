@@ -23,7 +23,7 @@ from app.schemas.listing import (
     ListingUpdate,
     SellableAssetRead,
 )
-from app.services import asset_service, listing_service, order_service
+from app.services import asset_service, audit_service, listing_service, order_service
 from app.services.marketplace_errors import MarketplaceError, RateLimitedError
 from app.storage import get_storage
 
@@ -110,11 +110,11 @@ def get_listing(
     is_buyer = current_user is not None and order_service.buyer_has_purchased(
         db, current_user.id, listing_id
     )
-    is_admin = current_user is not None and current_user.is_superuser
+    is_moderator = current_user is not None and current_user.is_moderator
     # Non-active listings are visible only to their seller, a buyer who
     # purchased them (so "sold" doesn't 404 the item you just bought), or
     # an admin moderating it.
-    if listing.status.value != "active" and not (is_seller or is_buyer or is_admin):
+    if listing.status.value != "active" and not (is_seller or is_buyer or is_moderator):
         raise HTTPException(status_code=404, detail="Listing not found.")
 
     out = _detail(listing)
@@ -139,7 +139,7 @@ def _owned_listing(db: DbSession, current_user: User, listing_id: str) -> Listin
     # 404 (not 403) for a non-owner, non-admin — matches the original M2
     # contract of not revealing that a listing exists to someone who can't
     # see it, rather than confirming its existence via a 403.
-    if listing.seller_id != current_user.id and not current_user.is_superuser:
+    if listing.seller_id != current_user.id and not current_user.is_moderator:
         raise HTTPException(status_code=404, detail="Listing not found.")
     return listing
 
@@ -167,12 +167,22 @@ def update_listing(
     listing_id: str, data: ListingUpdate, current_user: CurrentUser, db: DbSession
 ) -> ListingDetail:
     listing = _owned_listing(db, current_user, listing_id)
+    acting_as_mod = listing.seller_id != current_user.id
     try:
         listing = listing_service.update(db, current_user, listing, data)
     except MarketplaceError as exc:
         raise HTTPException(status_code=402, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if acting_as_mod:
+        audit_service.record(
+            db,
+            actor_id=current_user.id,
+            action="listing.update",
+            target_type="listing",
+            target_id=listing.id,
+            metadata={"title": listing.title, "seller_id": listing.seller_id},
+        )
     return _detail(listing)
 
 
@@ -185,7 +195,19 @@ def delete_listing(
         raise HTTPException(
             status_code=409, detail="Sold listings can't be deleted — delist instead."
         )
+    acting_as_mod = listing.seller_id != current_user.id
+    snapshot = {"title": listing.title, "seller_id": listing.seller_id}
+    lid = listing.id
     listing_service.delete_listing(db, listing)
+    if acting_as_mod:
+        audit_service.record(
+            db,
+            actor_id=current_user.id,
+            action="listing.delete",
+            target_type="listing",
+            target_id=lid,
+            metadata=snapshot,
+        )
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
@@ -286,7 +308,18 @@ def delete_comment(
     comment: ListingComment | None = listing_service.get_comment(db, comment_id)
     if comment is None:
         raise HTTPException(status_code=404, detail="Comment not found.")
-    if comment.author_id != current_user.id and not current_user.is_superuser:
+    if comment.author_id != current_user.id and not current_user.is_moderator:
         raise HTTPException(status_code=403, detail="Not your comment.")
+    acting_as_mod = comment.author_id != current_user.id
+    cid, cauthor = comment.id, comment.author_id
     listing_service.delete_comment(db, comment)
+    if acting_as_mod:
+        audit_service.record(
+            db,
+            actor_id=current_user.id,
+            action="listing_comment.delete",
+            target_type="listing_comment",
+            target_id=cid,
+            metadata={"author_id": cauthor},
+        )
     return Response(status_code=status.HTTP_204_NO_CONTENT)

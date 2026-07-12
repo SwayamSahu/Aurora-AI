@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { MessageSquare, Pencil, Trash2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { isModerator } from "@/lib/admin/access";
 import {
   useAdminDeleteComment,
   useAdminPostComments,
@@ -139,7 +140,7 @@ export default function AdminBlogPage() {
     );
   }
 
-  if (status !== "authenticated" || !user?.is_superuser) {
+  if (status !== "authenticated" || !isModerator(user)) {
     return (
       <p className="py-24 text-center text-muted-foreground">
         Admin access required.

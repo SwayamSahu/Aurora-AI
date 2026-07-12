@@ -3,6 +3,7 @@
 import { useParams } from "next/navigation";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { isModerator } from "@/lib/admin/access";
 import { usePost } from "@/lib/blog/queries";
 import { PostEditorForm } from "@/components/blog/editor/post-editor-form";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -41,7 +42,7 @@ export default function EditBlogPostPage() {
     );
   }
 
-  if (post.author.id !== user?.id && !user?.is_superuser) {
+  if (post.author.id !== user?.id && !isModerator(user)) {
     return (
       <p className="py-24 text-center text-muted-foreground">
         You can only edit your own posts.

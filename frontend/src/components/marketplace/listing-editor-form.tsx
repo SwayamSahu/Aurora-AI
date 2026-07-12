@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Trash2 } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { isModerator } from "@/lib/admin/access";
 import {
   useCreateListing,
   useDeleteListing,
@@ -52,7 +53,7 @@ export function ListingEditorForm({ existing }: { existing?: ListingDetail }) {
   // since the backend never quota-checks admins regardless of whose
   // listing they're touching.
   const isAdminEditingOthers =
-    !!user?.is_superuser && isEdit && existing.seller.id !== user.id;
+    isModerator(user) && isEdit && existing.seller.id !== user?.id;
 
   const [title, setTitle] = React.useState(existing?.title ?? "");
   const [description, setDescription] = React.useState(existing?.description ?? "");

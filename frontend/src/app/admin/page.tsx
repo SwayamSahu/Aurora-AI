@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, ShoppingBag } from "lucide-react";
+import { FileText, ScrollText, ShoppingBag } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { isAdmin, isModerator } from "@/lib/admin/access";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const SECTIONS = [
@@ -13,13 +14,23 @@ const SECTIONS = [
     title: "Blog Moderation",
     description:
       "Edit or delete any post, view drafts, and hide/edit/delete comments.",
+    adminOnly: false,
   },
   {
     href: "/admin/marketplace",
     icon: ShoppingBag,
     title: "Marketplace Admin",
     description:
-      "Plan catalog, listing moderation, wallet adjustments, refunds, and comment moderation.",
+      "Listing moderation and comments for all; plans, wallet adjustments and refunds for admins.",
+    adminOnly: false,
+  },
+  {
+    href: "/admin/audit",
+    icon: ScrollText,
+    title: "Audit Log",
+    description:
+      "Append-only record of every privileged admin and moderator action.",
+    adminOnly: true,
   },
 ];
 
@@ -35,7 +46,7 @@ export default function AdminIndexPage() {
     );
   }
 
-  if (status !== "authenticated" || !user?.is_superuser) {
+  if (status !== "authenticated" || !isModerator(user)) {
     return (
       <p className="py-24 text-center text-muted-foreground">
         Admin access required.
@@ -43,12 +54,17 @@ export default function AdminIndexPage() {
     );
   }
 
+  const admin = isAdmin(user);
+
   return (
     <div className="mx-auto w-full max-w-[700px] px-4 py-12 md:px-8">
-      <h1 className="mb-8 text-3xl font-extrabold tracking-tight">Admin</h1>
+      <h1 className="mb-2 text-3xl font-extrabold tracking-tight">Admin</h1>
+      <p className="mb-8 text-sm text-muted-foreground">
+        Signed in as <span className="font-semibold">{user?.role}</span>.
+      </p>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        {SECTIONS.map((section) => (
+        {SECTIONS.filter((s) => admin || !s.adminOnly).map((section) => (
           <Link
             key={section.href}
             href={section.href}

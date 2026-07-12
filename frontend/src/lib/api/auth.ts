@@ -1,10 +1,13 @@
 import { apiFetch } from "@/lib/api/client";
 
+export type UserRole = "user" | "moderator" | "admin";
+
 export interface User {
   id: string;
   email: string;
   full_name: string | null;
   is_active: boolean;
+  role: UserRole;
   is_superuser: boolean;
   preferences: Record<string, unknown>;
   created_at: string;
