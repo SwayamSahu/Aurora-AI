@@ -196,7 +196,7 @@ def test_admin_listing_browse_can_filter_by_status(client: TestClient, db_sessio
 
     drafts = client.get(
         "/api/v1/admin/marketplace/listings?status=draft", headers=h_admin
-    ).json()
+    ).json()["items"]
     assert all(item["status"] == "draft" for item in drafts)
     assert any(item["title"] == "Draft One" for item in drafts)
 

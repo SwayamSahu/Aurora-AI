@@ -235,9 +235,16 @@ export function updateAdminPlan(id: string, input: Partial<AdminPlanInput>) {
   });
 }
 
-export function listAdminListings(status?: string) {
-  const qs = status ? `?status=${encodeURIComponent(status)}` : "";
-  return apiFetch<MarketplaceListing[]>(`/admin/marketplace/listings${qs}`);
+export function listAdminListings(params: {
+  status?: string;
+  limit?: number;
+  offset?: number;
+}) {
+  const qs = new URLSearchParams();
+  if (params.status) qs.set("status", params.status);
+  qs.set("limit", String(params.limit ?? 24));
+  qs.set("offset", String(params.offset ?? 0));
+  return apiFetch<ListingListResponse>(`/admin/marketplace/listings?${qs.toString()}`);
 }
 
 export function adminDelistListing(id: string) {

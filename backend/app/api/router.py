@@ -8,6 +8,7 @@ from app.api.routes import (
     admin,
     admin_audit,
     admin_blog,
+    admin_users,
     assets,
     audio,
     auth,
@@ -41,6 +42,7 @@ api_router.include_router(listings.router)
 api_router.include_router(commerce.router)
 api_router.include_router(admin.router)
 api_router.include_router(admin_blog.router)
+api_router.include_router(admin_users.router)
 api_router.include_router(admin_audit.router)
 api_router.include_router(timeline.router)
 api_router.include_router(audio.router)

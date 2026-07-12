@@ -24,6 +24,7 @@ from app.schemas.commerce import OrderRead
 from app.schemas.listing import (
     ListingCommentAdminUpdate,
     ListingCommentRead,
+    ListingListResponse,
     ListingSummary,
 )
 from app.services import (
@@ -85,19 +86,23 @@ def update_plan(
 # --------------------------------------------------------------------------- #
 # Moderation
 # --------------------------------------------------------------------------- #
-@router.get("/listings", response_model=list[ListingSummary])
+@router.get("/listings", response_model=ListingListResponse)
 def list_all_listings(
     moderator: ModeratorUser,
     db: DbSession,
     status: Annotated[str | None, Query()] = None,
     seller_id: Annotated[str | None, Query()] = None,
     q: Annotated[str | None, Query()] = None,
-) -> list[ListingSummary]:
+    limit: Annotated[int, Query(ge=1, le=100)] = 24,
+    offset: Annotated[int, Query(ge=0)] = 0,
+) -> ListingListResponse:
     stmt_status = ListingStatus(status) if status else None
-    listings = listing_service.list_for_moderation(
-        db, status=stmt_status, seller_id=seller_id, query=q
+    listings, total = listing_service.list_for_moderation(
+        db, status=stmt_status, seller_id=seller_id, query=q, limit=limit, offset=offset
     )
-    return [listing_service.to_read(ListingSummary, listing) for listing in listings]
+    items = [listing_service.to_read(ListingSummary, listing) for listing in listings]
+    next_offset = offset + limit if offset + limit < total else None
+    return ListingListResponse(items=items, total=total, next_offset=next_offset)
 
 
 @router.post("/listings/{listing_id}/delist", response_model=ListingSummary)

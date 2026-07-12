@@ -226,9 +226,15 @@ function DeleteListingButton({ listingId }: { listingId: string }) {
 function ListingsTab() {
   const [status, setStatus] = React.useState<string>("all");
   const [openComments, setOpenComments] = React.useState<string | null>(null);
-  const { data: listings, isLoading } = useAdminListings(
-    status === "all" ? undefined : status,
-  );
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAdminListings(status === "all" ? undefined : status);
+  const listings = data?.pages.flatMap((page) => page.items) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
   const delist = useAdminDelistListing();
 
   return (
@@ -250,7 +256,7 @@ function ListingsTab() {
         <Skeleton className="h-40 w-full" />
       ) : (
         <div className="space-y-2">
-          {(listings ?? []).map((listing) => (
+          {listings.map((listing) => (
             <div
               key={listing.id}
               className="rounded-xl border border-[var(--mk-border)] bg-[var(--mk-surface-1)] p-4"
@@ -306,10 +312,25 @@ function ListingsTab() {
               ) : null}
             </div>
           ))}
-          {listings && listings.length === 0 ? (
+          {data && listings.length === 0 ? (
             <p className="py-8 text-center text-sm text-muted-foreground">
               No listings match this filter.
             </p>
+          ) : null}
+          {hasNextPage ? (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-muted-foreground">
+                Showing {listings.length} of {total}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchNextPage()}
+                loading={isFetchingNextPage}
+              >
+                Load more
+              </Button>
+            </div>
           ) : null}
         </div>
       )}

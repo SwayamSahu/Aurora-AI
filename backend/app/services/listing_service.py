@@ -219,8 +219,10 @@ def list_for_moderation(
     status: ListingStatus | None = None,
     seller_id: str | None = None,
     query: str | None = None,
-) -> list[Listing]:
-    stmt = select(Listing).options(*_EAGER).order_by(Listing.created_at.desc())
+    limit: int = 24,
+    offset: int = 0,
+) -> tuple[list[Listing], int]:
+    stmt = select(Listing)
     if status is not None:
         stmt = stmt.where(Listing.status == status)
     if seller_id:
@@ -228,7 +230,16 @@ def list_for_moderation(
     if query:
         like = f"%{query}%"
         stmt = stmt.where(Listing.title.ilike(like) | Listing.description.ilike(like))
-    return list(db.scalars(stmt))
+
+    total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+    stmt = (
+        stmt.options(*_EAGER)
+        .order_by(Listing.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    items = list(db.scalars(stmt))
+    return items, total
 
 
 def admin_delist(db: Session, listing: Listing) -> Listing:

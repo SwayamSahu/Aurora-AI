@@ -140,9 +140,12 @@ export function useAdminPosts(params: {
   author_id?: string;
   q?: string;
 }) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ["blog-admin-posts", params],
-    queryFn: () => listAllPostsAdmin(params),
+    queryFn: ({ pageParam }) =>
+      listAllPostsAdmin({ ...params, limit: PAGE_SIZE, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next_offset,
   });
 }
 

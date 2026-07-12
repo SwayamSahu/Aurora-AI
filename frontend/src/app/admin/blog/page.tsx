@@ -126,10 +126,18 @@ export default function AdminBlogPage() {
   const [q, setQ] = React.useState("");
   const [openComments, setOpenComments] = React.useState<string | null>(null);
 
-  const { data, isLoading } = useAdminPosts({
+  const {
+    data,
+    isLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAdminPosts({
     status: statusFilter === "all" ? undefined : statusFilter,
     q: q || undefined,
   });
+  const posts = data?.pages.flatMap((page) => page.items) ?? [];
+  const total = data?.pages[0]?.total ?? 0;
 
   if (status === "loading") {
     return (
@@ -177,7 +185,7 @@ export default function AdminBlogPage() {
         <Skeleton className="h-40 w-full" />
       ) : (
         <div className="space-y-2">
-          {(data?.items ?? []).map((post) => (
+          {posts.map((post) => (
             <div
               key={post.id}
               className="rounded-xl border border-[var(--mk-border)] bg-[var(--mk-surface-1)] p-4"
@@ -215,10 +223,25 @@ export default function AdminBlogPage() {
               ) : null}
             </div>
           ))}
-          {data && data.items.length === 0 ? (
+          {data && posts.length === 0 ? (
             <p className="py-16 text-center text-muted-foreground">
               No posts match this filter.
             </p>
+          ) : null}
+          {hasNextPage ? (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-xs text-muted-foreground">
+                Showing {posts.length} of {total}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => fetchNextPage()}
+                loading={isFetchingNextPage}
+              >
+                Load more
+              </Button>
+            </div>
           ) : null}
         </div>
       )}

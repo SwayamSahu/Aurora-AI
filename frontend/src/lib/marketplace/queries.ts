@@ -265,9 +265,12 @@ export function useUpdateAdminPlan() {
 }
 
 export function useAdminListings(status?: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: ["mk-admin-listings", status],
-    queryFn: () => listAdminListings(status),
+    queryFn: ({ pageParam }) =>
+      listAdminListings({ status, limit: 24, offset: pageParam }),
+    initialPageParam: 0,
+    getNextPageParam: (last) => last.next_offset,
   });
 }
 

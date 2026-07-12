@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { FileText, ScrollText, ShoppingBag } from "lucide-react";
+import { FileText, ScrollText, ShoppingBag, Users } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
 import { isAdmin, isModerator } from "@/lib/admin/access";
@@ -23,6 +23,14 @@ const SECTIONS = [
     description:
       "Listing moderation and comments for all; plans, wallet adjustments and refunds for admins.",
     adminOnly: false,
+  },
+  {
+    href: "/admin/users",
+    icon: Users,
+    title: "User Management",
+    description:
+      "Search accounts, view aggregated activity, change roles, and suspend/reactivate.",
+    adminOnly: true,
   },
   {
     href: "/admin/audit",
