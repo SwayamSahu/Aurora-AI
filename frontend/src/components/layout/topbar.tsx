@@ -3,9 +3,10 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Bell, Search, LogOut, User, Settings } from "lucide-react";
+import { Bell, Search, LogOut, User, Settings, ShieldCheck } from "lucide-react";
 
 import { useAuth } from "@/components/auth/auth-provider";
+import { isModerator } from "@/lib/admin/access";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme/theme-toggle";
 import {
@@ -109,6 +110,13 @@ export function Topbar({ title }: { title?: string }) {
                 <Settings /> Settings
               </Link>
             </DropdownMenuItem>
+            {isModerator(user) ? (
+              <DropdownMenuItem asChild>
+                <Link href="/admin">
+                  <ShieldCheck /> Admin console
+                </Link>
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem
               className="text-destructive focus:text-destructive"
