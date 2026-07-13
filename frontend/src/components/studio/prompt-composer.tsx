@@ -6,10 +6,12 @@ import { Wand2, Image as ImageIcon, Sparkles, Dices, Loader2 } from "lucide-reac
 import { cn } from "@/lib/utils";
 import {
   ASPECT_RATIOS,
+  clampDurationToModel,
   DEFAULT_ASPECT_RATIO,
-  DURATIONS,
-  VIDEO_MODELS,
+  DEFAULT_VIDEO_MODEL_ID,
+  durationOptionsFor,
 } from "@/lib/generation-options";
+import { useVideoModels } from "@/lib/query/generation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -22,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { StylePresets } from "@/components/studio/style-presets";
+import { ModelGallery } from "@/components/studio/model-gallery";
 
 export type GenerationType = "generate_video" | "generate_image";
 
@@ -42,7 +45,7 @@ export const initialComposerState = (
   type,
   prompt: "",
   negativePrompt: "",
-  model: VIDEO_MODELS[0].value,
+  model: DEFAULT_VIDEO_MODEL_ID,
   aspect: DEFAULT_ASPECT_RATIO,
   duration: "4",
   seed: "",
@@ -64,6 +67,17 @@ interface Props {
 export function PromptComposer({ state, onChange, onGenerate, busy }: Props) {
   const isVideo = state.type === "generate_video";
   const [enhancing, setEnhancing] = React.useState(false);
+
+  const modelsQuery = useVideoModels();
+  const models = modelsQuery.data ?? [];
+  const selectedSpec = models.find((m) => m.id === state.model);
+  const durationOptions = durationOptionsFor(selectedSpec);
+
+  // Picking a model re-validates the duration against its capability range.
+  function handleModelChange(modelId: string) {
+    const spec = models.find((m) => m.id === modelId);
+    onChange({ model: modelId, duration: clampDurationToModel(state.duration, spec) });
+  }
 
   function togglePreset(id: string) {
     const next = new Set(state.presets);
@@ -161,22 +175,16 @@ export function PromptComposer({ state, onChange, onGenerate, busy }: Props) {
         />
       </div>
 
-      {/* Video-only: model */}
+      {/* Video-only: model gallery */}
       {isVideo ? (
         <div className="space-y-1.5">
           <Label>Model</Label>
-          <Select value={state.model} onValueChange={(v) => onChange({ model: v })}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {VIDEO_MODELS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
-                  {m.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <ModelGallery
+            models={models}
+            value={state.model}
+            onChange={handleModelChange}
+            loading={modelsQuery.isLoading}
+          />
         </div>
       ) : null}
 
@@ -208,7 +216,7 @@ export function PromptComposer({ state, onChange, onGenerate, busy }: Props) {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {DURATIONS.map((d) => (
+                {durationOptions.map((d) => (
                   <SelectItem key={d.value} value={d.value}>
                     {d.label}
                   </SelectItem>

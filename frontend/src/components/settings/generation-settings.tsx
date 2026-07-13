@@ -10,10 +10,10 @@ import {
   ASPECT_RATIOS,
   aspectFromLegacyResolution,
   DEFAULT_GENERATION,
-  DURATIONS,
+  durationOptionsFor,
   type GenerationDefaults,
-  VIDEO_MODELS,
 } from "@/lib/generation-options";
+import { useVideoModels } from "@/lib/query/generation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -54,6 +54,11 @@ export function GenerationSettings() {
   const initial = readDefaults(user?.preferences);
   const [values, setValues] = React.useState<GenerationDefaults>(initial);
   const [saving, setSaving] = React.useState(false);
+
+  const models = useVideoModels().data ?? [];
+  const durationOptions = durationOptionsFor(
+    models.find((m) => m.id === values.default_model),
+  );
 
   const dirty =
     values.default_model !== initial.default_model ||
@@ -99,8 +104,8 @@ export function GenerationSettings() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {VIDEO_MODELS.map((m) => (
-                <SelectItem key={m.value} value={m.value}>
+              {models.map((m) => (
+                <SelectItem key={m.id} value={m.id}>
                   {m.label}
                 </SelectItem>
               ))}
@@ -137,7 +142,7 @@ export function GenerationSettings() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {DURATIONS.map((d) => (
+              {durationOptions.map((d) => (
                 <SelectItem key={d.value} value={d.value}>
                   {d.label}
                 </SelectItem>

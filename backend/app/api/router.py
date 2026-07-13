@@ -23,6 +23,7 @@ from app.api.routes import (
     dmca,
     edits,
     export,
+    generation,
     health,
     jobs,
     listings,
@@ -41,6 +42,7 @@ api_router.include_router(users.router)
 api_router.include_router(projects.router)
 api_router.include_router(assets.router)
 api_router.include_router(jobs.router)
+api_router.include_router(generation.router)
 api_router.include_router(edits.router)
 api_router.include_router(detect.router)
 api_router.include_router(blog.router)

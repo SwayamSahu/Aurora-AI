@@ -11,11 +11,13 @@ import { useJobProgress } from "@/lib/ws/use-job-progress";
 import { useProjects } from "@/lib/query/projects";
 import {
   ASPECT_RATIOS,
+  clampDurationToModel,
   DEFAULT_ASPECT_RATIO,
-  DURATIONS,
+  DEFAULT_VIDEO_MODEL_ID,
+  durationOptionsFor,
   resolutionForAspect,
-  VIDEO_MODELS,
 } from "@/lib/generation-options";
+import { useVideoModels } from "@/lib/query/generation";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -63,9 +65,17 @@ export function GenerationDialog({
     "generate_video",
   );
   const [prompt, setPrompt] = React.useState("");
-  const [model, setModel] = React.useState<string>(VIDEO_MODELS[0].value);
+  const [model, setModel] = React.useState<string>(DEFAULT_VIDEO_MODEL_ID);
   const [aspect, setAspect] = React.useState(DEFAULT_ASPECT_RATIO);
   const [duration, setDuration] = React.useState("4");
+
+  const models = useVideoModels().data ?? [];
+  const durationOptions = durationOptionsFor(models.find((m) => m.id === model));
+
+  function handleModelChange(modelId: string) {
+    setModel(modelId);
+    setDuration((d) => clampDurationToModel(d, models.find((m) => m.id === modelId)));
+  }
 
   const [activeJobId, setActiveJobId] = React.useState<string | null>(null);
   const create = useCreateJob(targetProject || "_");
@@ -196,13 +206,13 @@ export function GenerationDialog({
               <div className="grid grid-cols-3 gap-3">
                 <div className="space-y-1.5">
                   <Label>Model</Label>
-                  <Select value={model} onValueChange={setModel}>
+                  <Select value={model} onValueChange={handleModelChange}>
                     <SelectTrigger>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {VIDEO_MODELS.map((m) => (
-                        <SelectItem key={m.value} value={m.value}>
+                      {models.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
                           {m.label}
                         </SelectItem>
                       ))}
@@ -231,7 +241,7 @@ export function GenerationDialog({
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {DURATIONS.map((d) => (
+                      {durationOptions.map((d) => (
                         <SelectItem key={d.value} value={d.value}>
                           {d.label}
                         </SelectItem>

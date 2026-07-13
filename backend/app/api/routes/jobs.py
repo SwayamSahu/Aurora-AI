@@ -8,6 +8,7 @@ from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
 from app.db.models import Asset, Job
 from app.db.models.job import JobStatus, JobType
+from app.generators.model_catalog import get_model
 from app.schemas.asset import AssetRead
 from app.schemas.job import JobCreate, JobRead
 from app.services import asset_service, job_runner, job_service, project_service
@@ -77,6 +78,17 @@ def create_job(
         raise HTTPException(
             status_code=422, detail=f"'{required}' is required for this job."
         )
+    # A named video model must exist in the catalog and be enabled. Omitting
+    # `model` is allowed — the generator uses its own default.
+    if data.type == JobType.GENERATE_VIDEO:
+        model_id = (data.params or {}).get("model")
+        if model_id:
+            spec = get_model(model_id)
+            if spec is None or not spec.enabled:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Unknown or unavailable model '{model_id}'.",
+                )
 
     job = job_service.create(db, project_id, data.type, data.params)
     _dispatch(db, job)

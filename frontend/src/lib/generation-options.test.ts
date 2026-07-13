@@ -1,11 +1,33 @@
 import { describe, expect, it } from "vitest";
 
+import type { VideoModelSpec } from "@/lib/api/generation";
+
 import {
   ASPECT_RATIOS,
   aspectFromLegacyResolution,
+  clampDurationToModel,
   DEFAULT_ASPECT_RATIO,
+  durationOptionsFor,
   resolutionForAspect,
 } from "./generation-options";
+
+function spec(overrides: Partial<VideoModelSpec> = {}): VideoModelSpec {
+  return {
+    id: "test",
+    label: "Test",
+    provider: "Test",
+    kind: "api",
+    resolution: "1080p",
+    max_width: 1920,
+    max_height: 1080,
+    min_duration: 3,
+    max_duration: 15,
+    default_duration: 5,
+    supports_i2v: false,
+    badges: [],
+    ...overrides,
+  };
+}
 
 describe("aspect ratio catalog", () => {
   it("has a unique id per entry, matching the reference picker order", () => {
@@ -56,6 +78,54 @@ describe("resolutionForAspect", () => {
   it("width/height ratio approximates the requested aspect", () => {
     const r = resolutionForAspect("21:9")!;
     expect(r.width / r.height).toBeCloseTo(21 / 9, 1);
+  });
+});
+
+describe("durationOptionsFor (per-model capability envelope)", () => {
+  it("falls back to the static durations when no model is known", () => {
+    const opts = durationOptionsFor(undefined);
+    expect(opts.map((o) => o.value)).toEqual(["2", "4", "6"]);
+  });
+
+  it("only offers durations within the model's range, including endpoints", () => {
+    const opts = durationOptionsFor(spec({ min_duration: 3, max_duration: 15 }));
+    const vals = opts.map((o) => Number(o.value));
+    expect(Math.min(...vals)).toBe(3);
+    expect(Math.max(...vals)).toBe(15);
+    expect(vals.every((v) => v >= 3 && v <= 15)).toBe(true);
+    // Sorted ascending, no duplicates.
+    expect([...vals].sort((a, b) => a - b)).toEqual(vals);
+    expect(new Set(vals).size).toBe(vals.length);
+  });
+
+  it("handles a tight range (Veo 3.1 Lite: 4–8s)", () => {
+    const opts = durationOptionsFor(spec({ min_duration: 4, max_duration: 8 }));
+    expect(opts.map((o) => Number(o.value))).toEqual([4, 5, 6, 8]);
+  });
+
+  it("handles a very wide range (Kling Motion: 3–30s)", () => {
+    const opts = durationOptionsFor(spec({ min_duration: 3, max_duration: 30 }));
+    const vals = opts.map((o) => Number(o.value));
+    expect(vals[0]).toBe(3);
+    expect(vals[vals.length - 1]).toBe(30);
+  });
+});
+
+describe("clampDurationToModel", () => {
+  it("keeps an in-range duration unchanged", () => {
+    expect(clampDurationToModel("5", spec({ min_duration: 3, max_duration: 15 }))).toBe(
+      "5",
+    );
+  });
+
+  it("snaps an out-of-range duration to the model default", () => {
+    const s = spec({ min_duration: 4, max_duration: 8, default_duration: 6 });
+    expect(clampDurationToModel("2", s)).toBe("6"); // below min
+    expect(clampDurationToModel("15", s)).toBe("6"); // above max
+  });
+
+  it("passes the value through untouched when no model is known", () => {
+    expect(clampDurationToModel("2", undefined)).toBe("2");
   });
 });
 

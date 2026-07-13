@@ -146,3 +146,75 @@ def test_websocket_rejects_missing_token(client, auth_headers):
     with pytest.raises(WebSocketDisconnect):
         with client.websocket_connect(f"/api/v1/ws/jobs/{job['id']}") as ws:
             ws.receive_json()
+
+
+# --------------------------------------------------------------------------- #
+# Multi-model video generation
+# --------------------------------------------------------------------------- #
+MODELS = "/api/v1/generation/models"
+
+
+def test_model_catalog_endpoint_lists_models(client, auth_headers):
+    res = client.get(MODELS, headers=auth_headers)
+    assert res.status_code == 200
+    models = res.json()
+    ids = {m["id"] for m in models}
+    # A local default plus the requested hosted models are all selectable.
+    assert "ltx-video" in ids
+    assert {"kling-3.0", "veo-3.1-lite", "seedance-2.0", "wan-2.7"} <= ids
+    # Each entry carries the capability envelope the picker needs.
+    kling = next(m for m in models if m["id"] == "kling-3.0")
+    assert kling["min_duration"] == 3 and kling["max_duration"] == 15
+    assert kling["resolution"] == "4K"
+    assert "provider" in kling and "badges" in kling
+
+
+def test_generate_with_named_model_succeeds(client, auth_headers):
+    pid = _project(client, auth_headers)
+    res = client.post(
+        f"{P}/{pid}/jobs",
+        headers=auth_headers,
+        json={
+            "type": "generate_video",
+            "params": {"prompt": "a fox", "model": "kling-3.0", "duration_seconds": 5},
+        },
+    )
+    assert res.status_code == 201
+    assert res.json()["status"] == "succeeded"
+
+
+def test_generate_with_unknown_model_rejected(client, auth_headers):
+    pid = _project(client, auth_headers)
+    res = client.post(
+        f"{P}/{pid}/jobs",
+        headers=auth_headers,
+        json={
+            "type": "generate_video",
+            "params": {"prompt": "a fox", "model": "not-a-real-model"},
+        },
+    )
+    assert res.status_code == 422
+    assert "model" in res.json()["detail"].lower()
+
+
+def test_generation_clamps_duration_to_model_range(client, auth_headers, db_session):
+    """kling-3.0 min duration is 3s; a 1s request must be clamped up on the
+    produced asset rather than rejected."""
+    from app.db.models import Asset
+
+    pid = _project(client, auth_headers)
+    res = client.post(
+        f"{P}/{pid}/jobs",
+        headers=auth_headers,
+        json={
+            "type": "generate_video",
+            "params": {"prompt": "a fox", "model": "kling-3.0", "duration_seconds": 1},
+        },
+    )
+    assert res.status_code == 201
+    job = res.json()
+    assert job["status"] == "succeeded"
+    asset = db_session.get(Asset, job["result_asset"]["id"])
+    # The mock generator renders exactly the (clamped) requested duration.
+    assert asset.duration_seconds is not None
+    assert asset.duration_seconds >= 3.0

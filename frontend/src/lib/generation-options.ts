@@ -1,10 +1,18 @@
 /** Shared generation option catalogs. Mirrors backend generator params. */
 
+import type { VideoModelSpec } from "@/lib/api/generation";
+
+/** Static fallback used for the initial default model id and before the live
+ * catalog (`GET /generation/models`) has loaded. The authoritative, full list
+ * with capabilities comes from the backend. */
 export const VIDEO_MODELS = [
   { value: "ltx-video", label: "LTX-Video (fast, default)" },
   { value: "cogvideox-5b", label: "CogVideoX-5B (higher quality)" },
   { value: "wan-2.1", label: "Wan 2.1" },
 ] as const;
+
+/** The model selected before the user picks one (must exist in the catalog). */
+export const DEFAULT_VIDEO_MODEL_ID = "ltx-video";
 
 /**
  * Aspect ratio picker — the primary way users choose output shape (mirrors
@@ -87,6 +95,44 @@ export const DURATIONS = [
   { value: "4", label: "4 seconds" },
   { value: "6", label: "6 seconds" },
 ] as const;
+
+/** The discrete duration ladder offered across models; each model exposes the
+ * subset that falls within its own [min, max] envelope (plus its endpoints). */
+const DURATION_LADDER = [1, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30];
+
+/**
+ * Duration options for a model, constrained to its capability envelope. Falls
+ * back to the static `DURATIONS` when the model spec isn't known yet.
+ */
+export function durationOptionsFor(
+  spec: VideoModelSpec | undefined,
+): { value: string; label: string }[] {
+  if (!spec) return DURATIONS.map((d) => ({ value: d.value, label: d.label }));
+  const secs = new Set<number>([spec.min_duration, spec.max_duration]);
+  for (const s of DURATION_LADDER) {
+    if (s >= spec.min_duration && s <= spec.max_duration) secs.add(s);
+  }
+  return [...secs]
+    .sort((a, b) => a - b)
+    .map((s) => ({ value: String(s), label: `${s}s` }));
+}
+
+/**
+ * Return a duration that's valid for the model: keep the current value if it's
+ * within range, otherwise snap to the model's default. Used to re-validate the
+ * selected duration whenever the model changes.
+ */
+export function clampDurationToModel(
+  current: string,
+  spec: VideoModelSpec | undefined,
+): string {
+  if (!spec) return current;
+  const n = Number(current);
+  if (Number.isFinite(n) && n >= spec.min_duration && n <= spec.max_duration) {
+    return current;
+  }
+  return String(spec.default_duration);
+}
 
 /**
  * Style presets append descriptive cues to the prompt (and optionally seed a

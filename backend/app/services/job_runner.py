@@ -19,6 +19,7 @@ from app.generators.base import (
     VideoGenParams,
     VoiceGenParams,
 )
+from app.generators.model_catalog import clamp_video_params, get_model
 from app.generators.registry import (
     get_image_generator,
     get_music_generator,
@@ -40,12 +41,22 @@ _KIND_MAP = {
 def _generate(job: Job, progress) -> GeneratedMedia:
     p = job.params or {}
     if job.type == JobType.GENERATE_VIDEO:
+        duration = float(p.get("duration_seconds", 4.0))
+        width = int(p.get("width", 768))
+        height = int(p.get("height", 512))
+        # Clamp the request to the chosen model's capability envelope so it's
+        # valid whichever backend serves it (see model_catalog).
+        spec = get_model(p.get("model"))
+        if spec is not None:
+            duration, width, height = clamp_video_params(
+                spec, duration, width, height
+            )
         params = VideoGenParams(
             prompt=p.get("prompt", ""),
             negative_prompt=p.get("negative_prompt"),
-            duration_seconds=float(p.get("duration_seconds", 4.0)),
-            width=int(p.get("width", 768)),
-            height=int(p.get("height", 512)),
+            duration_seconds=duration,
+            width=width,
+            height=height,
             fps=int(p.get("fps", 24)),
             seed=p.get("seed"),
             model=p.get("model"),
