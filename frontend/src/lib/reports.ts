@@ -1,10 +1,20 @@
 import { apiFetch } from "@/lib/api/client";
 
+/** Content a *user* can report from the UI. */
 export type ReportTargetType =
   | "blog_post"
   | "blog_comment"
   | "listing"
   | "listing_comment";
+
+/** Every target type a report row can carry — the user-reportable ones above
+ * plus the media/asset targets that only the automated content-safety scan
+ * produces (blog_media/listing_media on upload, asset on generation). */
+export type ReportReadTargetType =
+  | ReportTargetType
+  | "blog_media"
+  | "listing_media"
+  | "asset";
 
 export type ReportReason = "spam" | "abuse" | "inappropriate" | "copyright" | "other";
 
@@ -22,7 +32,7 @@ export interface ReportTargetPreview {
 export interface ReportRead {
   id: string;
   reporter: ReportReporter | null;
-  target_type: ReportTargetType;
+  target_type: ReportReadTargetType;
   target_id: string;
   target_preview: ReportTargetPreview | null;
   reason: ReportReason;

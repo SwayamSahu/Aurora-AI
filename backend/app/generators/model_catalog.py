@@ -54,6 +54,12 @@ class ModelSpec:
     #: display badges, e.g. ["NEW", "4K", "EXCLUSIVE"]
     badges: list[str] = field(default_factory=list)
     enabled: bool = True
+    #: credits debited from the user's wallet per generation. Local models
+    #: are priced near-zero (compute is ours); hosted API models are priced
+    #: to roughly track their resolution tier and max duration, since we pay
+    #: the provider per generation. Admins can override this per model (see
+    #: `app.services.model_service`) without a redeploy.
+    credit_cost: int = 5
 
     @property
     def max_width(self) -> int:
@@ -79,6 +85,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=6,
         default_duration=4,
         supports_i2v=True,
+        credit_cost=4,
     ),
     ModelSpec(
         id="cogvideox-5b",
@@ -89,6 +96,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         min_duration=2,
         max_duration=6,
         default_duration=4,
+        credit_cost=6,
     ),
     ModelSpec(
         id="wan-2.1",
@@ -100,6 +108,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=6,
         default_duration=4,
         supports_i2v=True,
+        credit_cost=6,
     ),
     # -- Hosted, closed API models (simulated until provider adapters land) - #
     ModelSpec(
@@ -113,6 +122,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         default_duration=5,
         supports_i2v=True,
         badges=["4K"],
+        credit_cost=60,
     ),
     ModelSpec(
         id="seedance-2.0-mini",
@@ -124,6 +134,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=15,
         default_duration=5,
         badges=["NEW", "EXCLUSIVE"],
+        credit_cost=20,
     ),
     ModelSpec(
         id="seedance-2.0-fast",
@@ -134,6 +145,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         min_duration=4,
         max_duration=15,
         default_duration=5,
+        credit_cost=15,
     ),
     ModelSpec(
         id="gemini-omni-flash",
@@ -145,6 +157,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=10,
         default_duration=6,
         badges=["NEW"],
+        credit_cost=15,
     ),
     ModelSpec(
         id="kling-3.0",
@@ -157,6 +170,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         default_duration=5,
         supports_i2v=True,
         badges=["4K"],
+        credit_cost=65,
     ),
     ModelSpec(
         id="kling-3.0-turbo",
@@ -168,6 +182,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=15,
         default_duration=5,
         badges=["NEW"],
+        credit_cost=35,
     ),
     ModelSpec(
         id="kling-3.0-motion",
@@ -179,6 +194,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=30,
         default_duration=5,
         supports_i2v=True,
+        credit_cost=45,
     ),
     ModelSpec(
         id="happyhorse",
@@ -190,6 +206,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=15,
         default_duration=5,
         badges=["NEW"],
+        credit_cost=30,
     ),
     ModelSpec(
         id="grok-imagine",
@@ -200,6 +217,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         min_duration=1,
         max_duration=15,
         default_duration=4,
+        credit_cost=18,
     ),
     ModelSpec(
         id="grok-imagine-1.5",
@@ -211,6 +229,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=15,
         default_duration=4,
         badges=["NEW"],
+        credit_cost=20,
     ),
     ModelSpec(
         id="veo-3.1-lite",
@@ -223,6 +242,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         default_duration=6,
         supports_i2v=True,
         badges=["NEW"],
+        credit_cost=35,
     ),
     ModelSpec(
         id="wan-2.7",
@@ -234,6 +254,7 @@ MODEL_CATALOG: list[ModelSpec] = [
         max_duration=15,
         default_duration=5,
         badges=["NEW"],
+        credit_cost=30,
     ),
 ]
 

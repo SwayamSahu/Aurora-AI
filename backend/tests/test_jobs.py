@@ -16,6 +16,22 @@ def _project(client: TestClient, headers) -> str:
     return client.post(P, headers=headers, json={"name": "Gen"}).json()["id"]
 
 
+def _fund_wallet(db_session, credits: int, email: str = "alice@example.com") -> None:
+    """Grants `credits` to the `auth_headers` fixture's user — named-model
+    generation debits the wallet, so billing tests need a funded balance."""
+    from sqlalchemy import select
+
+    from app.db.models import TransactionType, User
+    from app.services import wallet_service
+
+    user = db_session.scalar(select(User).where(User.email == email))
+    wallet = wallet_service.get_or_create_wallet(db_session, user.id)
+    wallet_service.credit(
+        db_session, wallet, credits, TransactionType.ADMIN_ADJUST, note="test funding"
+    )
+    db_session.commit()
+
+
 def _create_video_job(client, headers, pid, prompt="a cat surfing"):
     return client.post(
         f"{P}/{pid}/jobs",
@@ -169,7 +185,8 @@ def test_model_catalog_endpoint_lists_models(client, auth_headers):
     assert "provider" in kling and "badges" in kling
 
 
-def test_generate_with_named_model_succeeds(client, auth_headers):
+def test_generate_with_named_model_succeeds(client, auth_headers, db_session):
+    _fund_wallet(db_session, 100)
     pid = _project(client, auth_headers)
     res = client.post(
         f"{P}/{pid}/jobs",
@@ -197,11 +214,89 @@ def test_generate_with_unknown_model_rejected(client, auth_headers):
     assert "model" in res.json()["detail"].lower()
 
 
+def test_named_model_debits_wallet_and_charges_are_snapshotted(
+    client, auth_headers, db_session
+):
+    _fund_wallet(db_session, 100)
+    pid = _project(client, auth_headers)
+    res = client.post(
+        f"{P}/{pid}/jobs",
+        headers=auth_headers,
+        json={
+            "type": "generate_video",
+            "params": {"prompt": "a fox", "model": "kling-3.0", "duration_seconds": 5},
+        },
+    )
+    assert res.status_code == 201
+    assert res.json()["status"] == "succeeded"
+
+    wallet = client.get("/api/v1/marketplace/wallet", headers=auth_headers).json()
+    assert wallet["balance_credits"] == 100 - 65  # kling-3.0 costs 65 credits
+
+    job = res.json()
+    from app.db.models import Job
+
+    row = db_session.get(Job, job["id"])
+    assert row.credits_charged == 65  # snapshotted even though job succeeded
+
+
+def test_insufficient_credits_rejected_and_no_job_created(client, auth_headers):
+    """A brand-new user has a 0 balance — a paid model must 402 rather than
+    silently running for free, and no job row should be left behind."""
+    pid = _project(client, auth_headers)
+    res = client.post(
+        f"{P}/{pid}/jobs",
+        headers=auth_headers,
+        json={
+            "type": "generate_video",
+            "params": {"prompt": "a fox", "model": "kling-3.0"},
+        },
+    )
+    assert res.status_code == 402
+    assert client.get(J, headers=auth_headers).json() == []
+
+
+def test_unnamed_model_generation_is_unmetered(client, auth_headers):
+    """Omitting `model` is allowed and must not touch the wallet at all."""
+    pid = _project(client, auth_headers)
+    res = _create_video_job(client, auth_headers, pid)
+    assert res.status_code == 201
+    wallet = client.get("/api/v1/marketplace/wallet", headers=auth_headers).json()
+    assert wallet["balance_credits"] == 0
+
+
+def test_refund_credits_restores_wallet_balance(client, auth_headers, db_session):
+    """Unit-level: a job that was charged but then fails should have its
+    credits refunded and its own `credits_charged` zeroed (so a second
+    failure-handling pass can't double-refund)."""
+    from app.db.models import Job, JobType
+    from app.services import job_service
+
+    _fund_wallet(db_session, 100)
+    pid = _project(client, auth_headers)
+
+    job = job_service.create(
+        db_session, pid, JobType.GENERATE_VIDEO, {"prompt": "x"}, credits_charged=40
+    )
+    job_service.refund_credits(db_session, job)
+
+    wallet = client.get("/api/v1/marketplace/wallet", headers=auth_headers).json()
+    assert wallet["balance_credits"] == 100 + 40
+    db_session.refresh(job)
+    assert job.credits_charged == 0
+
+    # Refunding again is a safe no-op — must not double-credit.
+    job_service.refund_credits(db_session, job)
+    wallet = client.get("/api/v1/marketplace/wallet", headers=auth_headers).json()
+    assert wallet["balance_credits"] == 100 + 40
+
+
 def test_generation_clamps_duration_to_model_range(client, auth_headers, db_session):
     """kling-3.0 min duration is 3s; a 1s request must be clamped up on the
     produced asset rather than rejected."""
     from app.db.models import Asset
 
+    _fund_wallet(db_session, 100)
     pid = _project(client, auth_headers)
     res = client.post(
         f"{P}/{pid}/jobs",

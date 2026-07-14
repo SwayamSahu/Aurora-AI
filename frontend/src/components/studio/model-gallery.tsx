@@ -66,6 +66,9 @@ export function ModelGallery({ models, value, onChange, loading }: Props) {
               <Badge variant="outline" className="px-1 py-0 text-[10px]">
                 {m.min_duration}–{m.max_duration}s
               </Badge>
+              <Badge variant="outline" className="px-1 py-0 text-[10px]">
+                {m.credit_cost} cr
+              </Badge>
               {m.badges.map((b) => (
                 <Badge
                   key={b}

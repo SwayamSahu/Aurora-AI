@@ -36,6 +36,15 @@ def test_every_spec_has_a_sane_capability_envelope():
         assert 1 <= m.min_duration <= m.default_duration <= m.max_duration
         assert m.max_width > 0 and m.max_height > 0
         assert m.resolution in {"720p", "1080p", "4K"}
+        assert m.credit_cost > 0
+
+
+def test_local_models_are_priced_below_api_models():
+    # Local models only cost us electricity; hosted API models cost real
+    # provider fees per call and must be priced meaningfully higher.
+    local_max = max(m.credit_cost for m in MODEL_CATALOG if m.kind == "local")
+    api_min = min(m.credit_cost for m in MODEL_CATALOG if m.kind == "api")
+    assert local_max < api_min
 
 
 def test_list_models_returns_only_enabled():

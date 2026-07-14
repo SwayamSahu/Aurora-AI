@@ -38,7 +38,9 @@ build/
 # Intentional, self-hosted, free-license marketplace mock assets
 !frontend/public/marketplace/
 !frontend/public/marketplace/**
-models/
+# ML weight caches at the repo root (anchored so it doesn't match source
+# directories that happen to be named "models", e.g. app/admin/models).
+/models/
 *.safetensors
 *.ckpt
 *.bin

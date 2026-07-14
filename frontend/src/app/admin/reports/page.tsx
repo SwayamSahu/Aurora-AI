@@ -25,6 +25,7 @@ const TARGET_TYPES = [
   "listing",
   "listing_comment",
   "listing_media",
+  "asset",
 ];
 
 const TARGET_LABELS: Record<string, string> = {
@@ -34,6 +35,7 @@ const TARGET_LABELS: Record<string, string> = {
   listing: "Listing",
   listing_comment: "Listing comment",
   listing_media: "Listing image (auto-scan)",
+  asset: "Generated media (auto-scan)",
 };
 
 function ReportRow({ report }: { report: ReportRead }) {
@@ -78,7 +80,8 @@ function ReportRow({ report }: { report: ReportRead }) {
             Reported by{" "}
             {report.reporter
               ? (report.reporter.full_name ?? report.reporter.email)
-              : report.target_type.endsWith("_media")
+              : report.target_type.endsWith("_media") ||
+                  report.target_type === "asset"
                 ? "automated content-safety scan"
                 : "a deleted user"}{" "}
             · {new Date(report.created_at).toLocaleString()}

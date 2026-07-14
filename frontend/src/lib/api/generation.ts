@@ -18,6 +18,8 @@ export interface VideoModelSpec {
   default_duration: number;
   supports_i2v: boolean;
   badges: string[];
+  /** Credits debited from the user's wallet per generation with this model. */
+  credit_cost: number;
 }
 
 export function listVideoModels() {

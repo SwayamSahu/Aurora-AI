@@ -11,6 +11,7 @@ from app.api.routes import (
     admin_blog,
     admin_dmca,
     admin_ledger,
+    admin_models,
     admin_reports,
     admin_system,
     admin_users,
@@ -55,6 +56,7 @@ api_router.include_router(admin.router)
 api_router.include_router(admin_blog.router)
 api_router.include_router(admin_users.router)
 api_router.include_router(admin_ledger.router)
+api_router.include_router(admin_models.router)
 api_router.include_router(admin_analytics.router)
 api_router.include_router(admin_reports.router)
 api_router.include_router(admin_dmca.router)

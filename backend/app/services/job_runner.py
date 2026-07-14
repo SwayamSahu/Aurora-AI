@@ -7,6 +7,11 @@ generated Asset. Used both inline (eager/dev/tests) and from the Celery worker.
 
 from __future__ import annotations
 
+import logging
+import subprocess
+import tempfile
+from pathlib import Path
+
 from sqlalchemy.orm import Session
 
 from app.db.models import Asset, Job, Project
@@ -27,8 +32,10 @@ from app.generators.registry import (
     get_video_generator,
     get_voice_generator,
 )
-from app.services import asset_service, job_service
+from app.services import asset_service, content_safety_service, job_service
 from app.storage import get_storage
+
+logger = logging.getLogger(__name__)
 
 _KIND_MAP = {
     "video": AssetKind.VIDEO,
@@ -36,6 +43,53 @@ _KIND_MAP = {
     "audio": AssetKind.AUDIO,
     "subtitles": AssetKind.SUBTITLES,
 }
+
+# Generated media kinds the automated content-safety scan screens. Audio/
+# subtitle outputs (TTS, music, transcription) aren't image-classifiable and
+# are out of scope here.
+_SAFETY_SCANNED_JOB_TYPES = {JobType.GENERATE_VIDEO, JobType.GENERATE_IMAGE}
+
+
+def _extract_first_frame(video_bytes: bytes) -> bytes:
+    """Grabs a generated video's first frame as PNG bytes, so the (image-only)
+    content-safety classifier can screen video output too."""
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "src.mp4"
+        out = Path(tmp) / "frame.png"
+        src.write_bytes(video_bytes)
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", str(src), "-frames:v", "1", str(out)],
+            capture_output=True,
+            check=True,
+        )
+        return out.read_bytes()
+
+
+def _scan_generated_asset(db: Session, job: Job, asset: Asset, media: GeneratedMedia) -> None:
+    """Runs the automated content-safety scan on a freshly generated asset.
+    Never raises — a scan failure (e.g. a corrupt frame extraction) must not
+    fail an otherwise-successful generation; it's logged and skipped."""
+    if job.type not in _SAFETY_SCANNED_JOB_TYPES:
+        return
+    try:
+        if media.kind == "image":
+            content_safety_service.scan_and_flag(
+                db, asset, image_bytes=media.data, target_type="asset"
+            )
+        elif media.kind == "video":
+            frame = _extract_first_frame(media.data)
+            content_safety_service.scan_and_flag(
+                db,
+                asset,
+                image_bytes=frame,
+                target_type="asset",
+                content_type="image/png",
+            )
+    except Exception:  # noqa: BLE001 — moderation scan is best-effort
+        logger.warning(
+            "Content-safety scan failed for asset %s (job %s)", asset.id, job.id,
+            exc_info=True,
+        )
 
 
 def _generate(job: Job, progress) -> GeneratedMedia:
@@ -121,6 +175,11 @@ def run_generation(db: Session, job: Job) -> Job:
     """
     project = db.get(Project, job.project_id)
     if project is None:
+        # No refund here: `Job.project_id` is ON DELETE CASCADE, so deleting a
+        # project also deletes its jobs — a charged job can't reach this branch
+        # with a missing project, and without the project there's no owner to
+        # refund to anyway. The refund path that matters is the generation
+        # failure below, where the project (and its wallet) still exist.
         job_service.mark_failed(db, job, "Project no longer exists.")
         return job
 
@@ -147,7 +206,9 @@ def run_generation(db: Session, job: Job) -> Job:
             width=media.width,
             height=media.height,
         )
+        _scan_generated_asset(db, job, asset, media)
         job_service.mark_succeeded(db, job, asset.id)
     except Exception as exc:  # noqa: BLE001 — record any failure on the job
+        job_service.refund_credits(db, job)
         job_service.mark_failed(db, job, str(exc))
     return job

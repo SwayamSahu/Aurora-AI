@@ -2,15 +2,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.generators.model_catalog import list_models
+from app.api.deps import DbSession
 from app.schemas.generation import VideoModelSpec
+from app.services import model_service
 
 router = APIRouter(tags=["generation"])
 
 
 @router.get("/generation/models", response_model=list[VideoModelSpec])
-def list_video_models() -> list[VideoModelSpec]:
-    """The catalog of selectable video-generation models for the Studio."""
+def list_video_models(db: DbSession) -> list[VideoModelSpec]:
+    """The catalog of selectable video-generation models for the Studio,
+    with any admin overrides (enable/disable, price) applied."""
     return [
         VideoModelSpec(
             id=m.id,
@@ -25,6 +27,7 @@ def list_video_models() -> list[VideoModelSpec]:
             default_duration=m.default_duration,
             supports_i2v=m.supports_i2v,
             badges=m.badges,
+            credit_cost=m.credit_cost,
         )
-        for m in list_models()
+        for m in model_service.list_effective_models(db)
     ]

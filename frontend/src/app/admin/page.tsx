@@ -9,6 +9,7 @@ import {
   Receipt,
   ScrollText,
   ShoppingBag,
+  Sparkles,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -85,6 +86,14 @@ const SECTIONS = [
     title: "System Health",
     description:
       "Live database/Redis/storage status and platform-scale counts.",
+    adminOnly: true,
+  },
+  {
+    href: "/admin/models",
+    icon: Sparkles,
+    title: "Video Models",
+    description:
+      "Enable/disable generation models and edit their credit price.",
     adminOnly: true,
   },
 ];

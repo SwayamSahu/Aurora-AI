@@ -8,10 +8,16 @@ from app.api.deps import CurrentUser, DbSession
 from app.core.config import settings
 from app.db.models import Asset, Job
 from app.db.models.job import JobStatus, JobType
-from app.generators.model_catalog import get_model
 from app.schemas.asset import AssetRead
 from app.schemas.job import JobCreate, JobRead
-from app.services import asset_service, job_runner, job_service, project_service
+from app.services import (
+    asset_service,
+    job_runner,
+    job_service,
+    model_service,
+    project_service,
+)
+from app.services.marketplace_errors import InsufficientCreditsError
 
 router = APIRouter(tags=["jobs"])
 
@@ -58,6 +64,48 @@ def _dispatch(db: DbSession, job: Job) -> None:
         db.refresh(job)
 
 
+def _price_video_model(db: DbSession, params: dict) -> tuple[str | None, int]:
+    """Validates a named video model (exists, enabled) and returns
+    `(model_id, credit_cost)`. Omitting `model` is allowed — the generator
+    uses its own default and the request is unmetered (cost 0)."""
+    model_id = (params or {}).get("model")
+    if not model_id:
+        return None, 0
+    spec = model_service.get_effective_model(db, model_id)
+    if spec is None or not spec.enabled:
+        raise HTTPException(
+            status_code=422, detail=f"Unknown or unavailable model '{model_id}'."
+        )
+    return model_id, spec.credit_cost
+
+
+def _create_and_charge(
+    db: DbSession, project_id: str, owner_id: str, job_type: JobType, params: dict
+) -> Job:
+    """Validates + prices a named video model, then debits the owner's wallet
+    and creates the job atomically (the charge and the job row share one
+    transaction — see `job_service.create_charged`, so the wallet can never be
+    debited without a job to refund against). Raises 402 if the wallet can't
+    cover it — nothing is written in that case."""
+    credit_cost = 0
+    note = ""
+    if job_type == JobType.GENERATE_VIDEO:
+        model_id, credit_cost = _price_video_model(db, params)
+        note = f"Video generation with {model_id}"
+    try:
+        return job_service.create_charged(
+            db,
+            project_id,
+            job_type,
+            params,
+            owner_id=owner_id,
+            credit_cost=credit_cost,
+            note=note,
+        )
+    except InsufficientCreditsError as exc:
+        raise HTTPException(status_code=402, detail=str(exc)) from exc
+
+
 @router.post("/projects/{project_id}/jobs", response_model=JobRead, status_code=201)
 def create_job(
     project_id: str,
@@ -78,19 +126,8 @@ def create_job(
         raise HTTPException(
             status_code=422, detail=f"'{required}' is required for this job."
         )
-    # A named video model must exist in the catalog and be enabled. Omitting
-    # `model` is allowed — the generator uses its own default.
-    if data.type == JobType.GENERATE_VIDEO:
-        model_id = (data.params or {}).get("model")
-        if model_id:
-            spec = get_model(model_id)
-            if spec is None or not spec.enabled:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Unknown or unavailable model '{model_id}'.",
-                )
 
-    job = job_service.create(db, project_id, data.type, data.params)
+    job = _create_and_charge(db, project_id, current_user.id, data.type, data.params)
     _dispatch(db, job)
     return _to_read(db, job)
 
@@ -123,7 +160,10 @@ def retry_job(job_id: str, current_user: CurrentUser, db: DbSession) -> JobRead:
     if old is None:
         raise HTTPException(status_code=404, detail="Job not found.")
     # Create a fresh job with the same params (keeps history of the failure).
-    job = job_service.create(db, old.project_id, old.type, old.params)
+    # Billed the same as a first attempt — a retry is a real new generation.
+    job = _create_and_charge(
+        db, old.project_id, current_user.id, old.type, old.params
+    )
     _dispatch(db, job)
     return _to_read(db, job)
 

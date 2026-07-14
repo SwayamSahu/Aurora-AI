@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from app.db.models import Report, ReportReason, ReportStatus
-from app.services import blog_service, listing_service
+from app.services import asset_service, blog_service, listing_service
 
 TARGET_TYPES = frozenset(
     {
@@ -22,12 +22,13 @@ TARGET_TYPES = frozenset(
         "listing",
         "listing_comment",
         "listing_media",
+        "asset",
     }
 )
 # Media targets only exist for the automated content-safety scan (a raw
-# upload has no title/body a human reporter could reference) — excluded
-# from the user-facing report form's allowed set.
-USER_REPORTABLE_TARGET_TYPES = TARGET_TYPES - {"blog_media", "listing_media"}
+# upload/generation has no title/body a human reporter could reference) —
+# excluded from the user-facing report form's allowed set.
+USER_REPORTABLE_TARGET_TYPES = TARGET_TYPES - {"blog_media", "listing_media", "asset"}
 
 
 class InvalidTargetError(Exception):
@@ -51,6 +52,8 @@ def _target_exists(db: Session, target_type: str, target_id: str) -> bool:
         return listing_service.get_comment(db, target_id) is not None
     if target_type == "listing_media":
         return listing_service.get_media(db, target_id) is not None
+    if target_type == "asset":
+        return asset_service.get_by_id(db, target_id) is not None
     return False
 
 
@@ -75,6 +78,13 @@ def get_target_preview(db: Session, target_type: str, target_id: str) -> dict | 
     if target_type == "listing_media":
         media = listing_service.get_media(db, target_id)
         return {"title": f"Uploaded image ({media.content_type})", "deleted": False} if media else None
+    if target_type == "asset":
+        asset = asset_service.get_by_id(db, target_id)
+        return (
+            {"title": f"Generated {asset.kind.value} ({asset.content_type})", "deleted": False}
+            if asset
+            else None
+        )
     return None
 
 

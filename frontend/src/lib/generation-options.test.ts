@@ -25,6 +25,7 @@ function spec(overrides: Partial<VideoModelSpec> = {}): VideoModelSpec {
     default_duration: 5,
     supports_i2v: false,
     badges: [],
+    credit_cost: 10,
     ...overrides,
   };
 }

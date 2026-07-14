@@ -81,6 +81,13 @@ def list_for_project(
     return list(db.scalars(stmt).all())
 
 
+def get_by_id(db: Session, asset_id: str) -> Asset | None:
+    """Unscoped lookup — for admin/moderation contexts (e.g. the content-safety
+    report queue) where the caller isn't the asset's owner. Ownership-checked
+    reads should use `get_for_owner` instead."""
+    return db.get(Asset, asset_id)
+
+
 def get_for_owner(db: Session, owner_id: str, asset_id: str) -> Asset | None:
     return db.scalar(
         select(Asset)
