@@ -19,11 +19,10 @@ import json
 import logging
 from dataclasses import replace
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db.models import PlatformSetting
 from app.generators.model_catalog import MODEL_CATALOG, ModelSpec, get_model
+from app.services import platform_settings_service as settings_store
 
 logger = logging.getLogger(__name__)
 
@@ -34,14 +33,9 @@ def _override_key(model_id: str) -> str:
     return f"{_OVERRIDE_PREFIX}{model_id}"
 
 
-def _read_override(db: Session, model_id: str) -> dict | None:
-    row = db.scalar(
-        select(PlatformSetting).where(PlatformSetting.key == _override_key(model_id))
-    )
-    if row is None:
-        return None
+def _parse_override(model_id: str, key: str, raw_value: str) -> dict | None:
     try:
-        return json.loads(row.value)
+        return json.loads(raw_value)
     except (ValueError, TypeError):
         # A corrupted override row degrades gracefully to catalog defaults, but
         # log it — silently ignoring means a model could e.g. silently re-enable
@@ -49,10 +43,31 @@ def _read_override(db: Session, model_id: str) -> dict | None:
         logger.warning(
             "Ignoring corrupted model override for '%s' (key '%s'): %r",
             model_id,
-            _override_key(model_id),
-            row.value,
+            key,
+            raw_value,
         )
         return None
+
+
+def _read_override(db: Session, model_id: str) -> dict | None:
+    key = _override_key(model_id)
+    raw_value = settings_store.get_value(db, key)
+    if raw_value is None:
+        return None
+    return _parse_override(model_id, key, raw_value)
+
+
+def _read_all_overrides(db: Session) -> dict[str, dict]:
+    """Every model override, in ONE query — used by `list_effective_models`
+    to avoid an N+1 (one query per catalog model)."""
+    raw = settings_store.get_values_by_prefix(db, _OVERRIDE_PREFIX)
+    result: dict[str, dict] = {}
+    for key, raw_value in raw.items():
+        model_id = key.removeprefix(_OVERRIDE_PREFIX)
+        override = _parse_override(model_id, key, raw_value)
+        if override is not None:
+            result[model_id] = override
+    return result
 
 
 def _apply_override(spec: ModelSpec, override: dict | None) -> ModelSpec:
@@ -76,7 +91,8 @@ def get_effective_model(db: Session, model_id: str) -> ModelSpec | None:
 
 
 def list_effective_models(db: Session, *, enabled_only: bool = True) -> list[ModelSpec]:
-    models = [_apply_override(m, _read_override(db, m.id)) for m in MODEL_CATALOG]
+    overrides = _read_all_overrides(db)
+    models = [_apply_override(m, overrides.get(m.id)) for m in MODEL_CATALOG]
     if enabled_only:
         models = [m for m in models if m.enabled]
     return models
@@ -107,14 +123,7 @@ def set_override(
     if credit_cost is not None:
         current["credit_cost"] = credit_cost
 
-    key = _override_key(model_id)
-    row = db.scalar(select(PlatformSetting).where(PlatformSetting.key == key))
-    value = json.dumps(current)
-    if row is None:
-        row = PlatformSetting(key=key, value=value)
-        db.add(row)
-    else:
-        row.value = value
+    settings_store.upsert_value(db, _override_key(model_id), json.dumps(current))
     db.commit()
 
     return get_effective_model(db, model_id)  # type: ignore[return-value]
@@ -122,10 +131,6 @@ def set_override(
 
 def clear_override(db: Session, model_id: str) -> ModelSpec | None:
     """Remove any admin override, reverting the model to its catalog default."""
-    row = db.scalar(
-        select(PlatformSetting).where(PlatformSetting.key == _override_key(model_id))
-    )
-    if row is not None:
-        db.delete(row)
-        db.commit()
+    settings_store.delete_value(db, _override_key(model_id))
+    db.commit()
     return get_effective_model(db, model_id)

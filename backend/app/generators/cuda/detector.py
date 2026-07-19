@@ -13,14 +13,13 @@ the mock detector satisfies, so the frontend is unchanged.
 
 from __future__ import annotations
 
+import io
 import logging
 import os
-import subprocess
-import tempfile
-from pathlib import Path
 
 from app.generators.base import DetectedObject, DetectParams, ObjectDetector
 from app.generators.cuda.vram import acquire_pipeline
+from app.media.video_frames import extract_first_frame
 
 logger = logging.getLogger(__name__)
 
@@ -31,28 +30,6 @@ _SAM2_MODEL = "facebook/sam2-hiera-large"
 _BOX_THRESHOLD = 0.3
 _TEXT_THRESHOLD = 0.25
 _MAX_TEXT_BOXES = 8
-
-
-def _extract_frame(video: bytes) -> Path:
-    """Write the source and pull its first frame to a PNG; returns the path.
-
-    The temp dir is intentionally not cleaned here — the caller reads the PNG
-    immediately after; the OS reaps the temp file. Kept simple for the GPU box.
-    """
-    tmp = Path(tempfile.mkdtemp(prefix="aurora_detect_"))
-    src = tmp / "src.mp4"
-    src.write_bytes(video)
-    frame = tmp / "frame.png"
-    proc = subprocess.run(
-        ["ffmpeg", "-y", "-i", str(src), "-frames:v", "1", str(frame)],
-        capture_output=True,
-    )
-    if proc.returncode != 0:
-        raise RuntimeError(
-            "ffmpeg frame extract failed: "
-            + proc.stderr.decode("utf-8", "replace")[-400:]
-        )
-    return frame
 
 
 class CudaObjectDetector(ObjectDetector):
@@ -69,12 +46,14 @@ class CudaObjectDetector(ObjectDetector):
             raise RuntimeError(
                 "CUDA detection requires the clip's source bytes on params.source."
             )
-        frame = _extract_frame(source)
+        frame = extract_first_frame(source)
         if params.mode == "click":
             return self._detect_click(frame, params)
         return self._detect_text(frame, params)
 
-    def _detect_click(self, frame: Path, params: DetectParams) -> list[DetectedObject]:
+    def _detect_click(
+        self, frame: bytes, params: DetectParams
+    ) -> list[DetectedObject]:
         import numpy as np  # noqa: PLC0415
         from PIL import Image  # noqa: PLC0415
         from sam2.sam2_image_predictor import SAM2ImagePredictor  # noqa: PLC0415
@@ -83,7 +62,7 @@ class CudaObjectDetector(ObjectDetector):
             return SAM2ImagePredictor.from_pretrained(_SAM2_MODEL, cache_dir=_HF_HOME)
 
         predictor = acquire_pipeline(f"{self.name}:sam2", _loader)
-        image = np.array(Image.open(frame).convert("RGB"))
+        image = np.array(Image.open(io.BytesIO(frame)).convert("RGB"))
         h, w = image.shape[:2]
         predictor.set_image(image)
 
@@ -108,7 +87,9 @@ class CudaObjectDetector(ObjectDetector):
             )
         ]
 
-    def _detect_text(self, frame: Path, params: DetectParams) -> list[DetectedObject]:
+    def _detect_text(
+        self, frame: bytes, params: DetectParams
+    ) -> list[DetectedObject]:
         import torch  # noqa: PLC0415
         from PIL import Image  # noqa: PLC0415
         from transformers import (  # noqa: PLC0415
@@ -129,7 +110,7 @@ class CudaObjectDetector(ObjectDetector):
             return processor, model
 
         processor, model = acquire_pipeline(f"{self.name}:gdino", _loader)
-        image = Image.open(frame).convert("RGB")
+        image = Image.open(io.BytesIO(frame)).convert("RGB")
         w, h = image.size
 
         # GroundingDINO expects a lowercased, period-terminated prompt.

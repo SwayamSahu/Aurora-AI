@@ -8,9 +8,6 @@ generated Asset. Used both inline (eager/dev/tests) and from the Celery worker.
 from __future__ import annotations
 
 import logging
-import subprocess
-import tempfile
-from pathlib import Path
 
 from sqlalchemy.orm import Session
 
@@ -32,6 +29,7 @@ from app.generators.registry import (
     get_video_generator,
     get_voice_generator,
 )
+from app.media.video_frames import extract_first_frame
 from app.services import asset_service, content_safety_service, job_service
 from app.storage import get_storage
 
@@ -50,21 +48,6 @@ _KIND_MAP = {
 _SAFETY_SCANNED_JOB_TYPES = {JobType.GENERATE_VIDEO, JobType.GENERATE_IMAGE}
 
 
-def _extract_first_frame(video_bytes: bytes) -> bytes:
-    """Grabs a generated video's first frame as PNG bytes, so the (image-only)
-    content-safety classifier can screen video output too."""
-    with tempfile.TemporaryDirectory() as tmp:
-        src = Path(tmp) / "src.mp4"
-        out = Path(tmp) / "frame.png"
-        src.write_bytes(video_bytes)
-        subprocess.run(
-            ["ffmpeg", "-y", "-i", str(src), "-frames:v", "1", str(out)],
-            capture_output=True,
-            check=True,
-        )
-        return out.read_bytes()
-
-
 def _scan_generated_asset(db: Session, job: Job, asset: Asset, media: GeneratedMedia) -> None:
     """Runs the automated content-safety scan on a freshly generated asset.
     Never raises — a scan failure (e.g. a corrupt frame extraction) must not
@@ -77,7 +60,7 @@ def _scan_generated_asset(db: Session, job: Job, asset: Asset, media: GeneratedM
                 db, asset, image_bytes=media.data, target_type="asset"
             )
         elif media.kind == "video":
-            frame = _extract_first_frame(media.data)
+            frame = extract_first_frame(media.data)
             content_safety_service.scan_and_flag(
                 db,
                 asset,
